@@ -26,5 +26,9 @@ def linear_diff(x,A,b):
     return la.norm(np.dot(A,x)-b)
 
 ## various methods for minimizing ||Ax - b|| based on x_init
-res = sp.optimize.minimize(linear_diff,x_init,args=(A,b),method='Nelder-Mead')
-print(res)
+opts = ['Nelder-Mead','CG','BFGS','Newton-CG','L-BFGS-B']
+
+for opt in opts:
+    res = sp.optimize.minimize(linear_diff,x_init,args=(A,b),method=opt)
+    print(res.success)
+    print(res.message)
