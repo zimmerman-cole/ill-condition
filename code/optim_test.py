@@ -5,29 +5,26 @@ import random
 
 from scipy.optimize import minimize
 
-# x0 = [1.3, 0.7, 0.8, 1.9, 1.2]
-# res = minimize(rosen, x0, method='Nelder-Mead')
-# res.x
-# print(rosen(x0))
-
-lo = -1000
-hi = 1000
-n = 100
+## generating ill-conditioned matrix A
+lo = -1000  # low range of random integers
+hi = 1000   # high range of random integers
+n = 100     # dimension (square) of A
 line = [random.randint(lo,hi) for i in range(n)]
 A = np.vander(line)
 
-print(la.cond(A))
-print(A)
-
+## generate true solution
 x_true = [random.randint(lo,hi) for i in range(n)]
+
+## generate data
 b = np.dot(A,x_true)
 
+## initial (bad, random) guess
 x_init = [np.random.normal() for i in range(n)]
 
-def linear_diff(x_init,A,b,normtype='fro'):
-    return la.norm(b-np.dot(A,x))
+## ||Ax - b||
+def linear_diff(x,A,b):
+    return la.norm(np.dot(A,x)-b)
 
-print(linear_diff((A,x_init,b)))
-
-res = sp.optimize.minimize(fun=linear_diff,x0=x_init,args=[A,b,'fro'],method='Nelder-Mead')
-print(res.x)
+## various methods for minimizing ||Ax - b|| based on x_init
+res = sp.optimize.minimize(linear_diff,x_init,args=(A,b),method='Nelder-Mead')
+print(res)
