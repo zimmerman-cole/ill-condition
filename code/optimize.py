@@ -4,7 +4,7 @@ import numpy.linalg as la
 # use as baseline to test conjugate gradient
 def gradient_descent(X, g, f = None, numIter = 30):
     """
-    Bog standard gradient descent for SYMMETRIC,
+    Standard gradient descent for SYMMETRIC,
     POSITIVE-DEFINITE matrices.
     Needs thorough testing.
 
