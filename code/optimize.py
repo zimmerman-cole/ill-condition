@@ -90,18 +90,21 @@ def conjugate_gradient(X, g, f = None, numIter = 30):
     """
     pass
 
-import numpy as np
-import numpy.linalg as la
-
 def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
     '''
     Solves Ax = b with Jacobi splitting method
         A \in R^[n x n]
         b,x \in R^n
+
+    ONLY WORKS for matrices A such that spectral_radius(B) < 1, where
+        B = D-1 E,
+        D = diagonal elements of A (zero elsewhere),
+        E = non-diagonal elements of A (zero on diagonal)
+
     '''
 
     n = A.shape[0]
-    
+
     ## start
     if x0 == None:
         x0 = np.random.randn(n)
@@ -115,13 +118,19 @@ def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
     Dinv = la.inv(D)
     B = np.dot(-Dinv,E)
     z = np.dot(Dinv,b)
-    print(la.cond(B))
+
+    spec_rad = max(la.svd(B)[1])**2
+    if spec_rad >= 1:
+        print('Spectral radius of B (%f) >= 1. Method won\'t converge.' % spec_rad)
+        print('Returning None.')
+    else: print('Spectral radius of B: %f' % spec_rad)
 
     ## iterations
     x = x0
     for i in range(maxiter):
         x = np.dot(B,x) + z
-        print(la.norm(np.dot(A,x)-b))    
+        #print(la.norm(np.dot(A,x)-b))
         if la.norm(np.dot(A,x)-b) <= tol:
             break
-    return(x)
+
+    return x
