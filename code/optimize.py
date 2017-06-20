@@ -57,3 +57,39 @@ def conjugate_gradient(X, g, f = None, numIter = 30):
     placeholder
     """
     pass
+
+import numpy as np
+import numpy.linalg as la
+
+def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
+    '''
+    Solves Ax = b with Jacobi splitting method
+        A \in R^[n x n]
+        b,x \in R^n
+    '''
+
+    n = A.shape[0]
+    
+    ## start
+    if x0 == None:
+        x0 = np.random.randn(n)
+
+    ## construct matrix components
+    D = np.zeros([n,n])
+    for i in range(n):
+        for j in range(n):
+            D[i][i] = A[i][i]
+    E = A-D
+    Dinv = la.inv(D)
+    B = np.dot(-Dinv,E)
+    z = np.dot(Dinv,b)
+    print(la.cond(B))
+
+    ## iterations
+    x = x0
+    for i in range(maxiter):
+        x = np.dot(B,x) + z
+        print(la.norm(np.dot(A,x)-b))    
+        if la.norm(np.dot(A,x)-b) <= tol:
+            break
+    return(x)
