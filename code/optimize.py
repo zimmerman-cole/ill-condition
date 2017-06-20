@@ -75,6 +75,40 @@ def conjugate_gs(u, A):
 
     return d
 
+def conjugate_gs_alt(U, A):
+    """
+    Conjugate Gram-Schmidt process.
+    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf
+
+    Args:
+        (numpy.ndarray) U: array of n linearly independent column vectors.
+        (numpy.ndarray) A: matrix for vectors to be mutually conjugate to.
+
+    Returns:
+        (numpy.ndarray) D: array of n mutually A-conjugate column vectors.
+    """
+    n = len(U)
+    D = np.copy(U)
+    beta = np.zeros([n,n])
+
+    D[:, 0] = U[:, 0]
+    for i in range(1, n):
+        for j in range(0,i-1):
+
+            Adj = np.dot(A, D[:, j])
+
+            beta[i, j] = -np.dot(U[:, i].T, Adj)
+            beta[i, j] /= np.dot(D[:, j].T, Adj) # (37)
+
+            D[:, i] = U[:, i] + np.dot(beta[i, j], D[:, j]) # (36)
+
+    ## checks
+    for i in range(0, n-1):
+        for j in range(i+1,n):    
+            # print( np.dot(U[:, i],np.dot(A,D[:, j])) + beta[i, j]*np.dot(D[:, j].T,np.dot(A,D[:, j])) )
+            print( np.dot(D[:,i], np.dot(A, D[:,j])) )
+
+    return D
 
 
 # REFERENCE IMPLEMENTATION
