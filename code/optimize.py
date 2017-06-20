@@ -1,5 +1,7 @@
 import numpy as np
 import numpy.linalg as la
+import traceback
+import sys
 
 # use as baseline to test conjugate gradient
 def gradient_descent(X, g, f = None, numIter = 30):
@@ -9,10 +11,10 @@ def gradient_descent(X, g, f = None, numIter = 30):
     Needs thorough testing.
 
     Args:
-        numpy.ndarray X: n x n transformation matrix.
-        numpy.ndarray g: n x 1 "target values".
-        numpy.ndarray f: n x 1 initial guess (optional).
-        int     numIter: Number of passes over data.
+        numpy.ndarray X:    n x n transformation matrix.
+        numpy.ndarray g:    n x 1 "target values".
+        numpy.ndarray f:    n x 1 initial guess (optional).
+        int     numIter:    Number of passes over data.
 
     Returns:
         argmin(f) [Xf - g].
@@ -44,6 +46,36 @@ def gradient_descent(X, g, f = None, numIter = 30):
         f += a * r
 
     return f
+
+def conjugate_gs(u, A):
+    """
+    Conjugate Gram-Schmidt process.
+    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf
+
+    Args:
+        (numpy.ndarray) u: array of n linearly independent column vectors.
+        (numpy.ndarray) A: matrix for vectors to be mutually conjugate to.
+
+    Returns:
+        (numpy.ndarray) d: array of n mutually A-conjugate column vectors.
+    """
+    n = len(u)
+    d = np.copy(u)
+
+    for i in range(1, n):
+        for j in range(0,i):
+
+            Adj = np.dot(A, d[:, j])
+
+
+            Bij = -np.inner(u[:, i].T, Adj)
+            Bij /= np.inner(d[:, j].T, Adj) # (37)
+
+            d[:, i] += np.dot(Bij, d[:, j]) # (36)
+
+    return d
+
+
 
 # REFERENCE IMPLEMENTATION
 def conjugate_gradient_ideal(X, g, f = None, numIter = 30):
