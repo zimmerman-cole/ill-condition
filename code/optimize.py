@@ -2,9 +2,19 @@ import numpy as np
 import numpy.linalg as la
 import traceback
 import sys
+import scipy
+from scipy import optimize as scopt
+
+
+def norm_dif(x, *args):
+    """
+    Return || b - Ax || (Frobenius norm).
+    """
+    A, b = args
+    return la.norm(b - np.dot(A, x))
 
 # use as baseline to test conjugate gradient
-def gradient_descent(X, g, f = None, numIter = 30):
+def gradient_descent(X, g, f = None, numIter = 500):
     """
     Standard gradient descent for SYMMETRIC,
     POSITIVE-DEFINITE matrices.
@@ -104,21 +114,20 @@ def conjugate_gs_alt(U, A):
 
     ## checks
     for i in range(0, n-1):
-        for j in range(i+1,n):    
+        for j in range(i+1,n):
             # print( np.dot(U[:, i],np.dot(A,D[:, j])) + beta[i, j]*np.dot(D[:, j].T,np.dot(A,D[:, j])) )
             print( np.dot(D[:,i], np.dot(A, D[:,j])) )
 
     return D
 
-
 # REFERENCE IMPLEMENTATION
-def conjugate_gradient_ideal(X, g, f = None, numIter = 30):
+def conjugate_gradient_ideal(X, g, f = None, numIter = 500):
     """
     For SYMMETRIC, POSITIVE-DEFINITE matrices.
     """
     pass
 
-def conjugate_gradient(X, g, f = None, numIter = 30):
+def conjugate_gradient(X, g, f = None, numIter = 500):
     """
     placeholder
     """
@@ -165,6 +174,43 @@ def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
         x = np.dot(B,x) + z
         #print(la.norm(np.dot(A,x)-b))
         if la.norm(np.dot(A,x)-b) <= tol:
+            break
+
+    return x
+
+def iter_refinement(A, b, tol=0.001, maxIter=500, x0=None, debug=False):
+    """
+    Iterative refinement method.
+    Use as a sort of postprocessing to fix round-off error?
+
+    https://en.wikipedia.org/wiki/Iterative_refinement
+
+    Works, but needs more testing on various sizes, condition numbers + initial
+    error in Ax=b.
+    """
+    # tol *= la.norm(A)
+
+    m = len(A)
+    n = len(A.T)
+    if x0 is None:
+        x0 = np.random.randn(n)
+
+    x = x0
+
+    for _ in range(maxIter):
+        if debug: print('Iter %d' % _)
+        # Compute the residual r
+        r = b - np.dot(A, x)
+
+        # Solve the system (Ad = r) for d
+        result = scopt.minimize(fun=norm_dif, x0=np.random.randn(m), args=(A, r), method='CG')
+        d, success, msg = result.x, result.success, result.message
+        if debug: print(success, msg)
+        # TODO: find out which method is best/quickest to solve this
+
+        x += d
+
+        if norm_dif(x, A, b) < tol:
             break
 
     return x
