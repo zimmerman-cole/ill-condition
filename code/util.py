@@ -82,3 +82,24 @@ def psd_with_cond(cond_num, n=50, min_sing=None):
 
     B = np.dot(u, np.dot(np.diag(s), v))
     return np.dot(B.T,B)
+
+def ghetto_command_line():
+    """
+    Unfinished
+    """
+    num_mem = 100 # number of past commands to remember
+    past_commands = []
+    while True:
+        try:
+            sys.stdout.write('>>> ')
+            inp = raw_input()
+            if inp=='continue':
+                break
+            else:
+                past_commands.append(inp)
+                exec(inp)
+        except KeyboardInterrupt:
+            print('')
+            break
+        except BaseException:
+            traceback.print_exc()
