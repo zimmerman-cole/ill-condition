@@ -20,6 +20,8 @@ def gradient_descent(X, g, f = None, numIter = 500):
     POSITIVE-DEFINITE matrices.
     Needs thorough testing.
 
+    Re-calculates residual EVERY iteration (so slow but a bit more accurate).
+
     Args:
         numpy.ndarray X:    n x n transformation matrix.
         numpy.ndarray g:    n x 1 "target values".
@@ -121,17 +123,70 @@ def conjugate_gs_alt(U, A):
     return D
 
 # REFERENCE IMPLEMENTATION
-def conjugate_gradient_ideal(X, g, f = None, numIter = 500):
+def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
     """
     For SYMMETRIC, POSITIVE-DEFINITE matrices.
-    """
-    pass
+    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf (p. 32)
 
-def conjugate_gradient(X, g, f = None, numIter = 500):
+    Tested on a handful of small (~50x50 - 500x500 matrices) w/ various
+    condition numbers. Behaviour is as expected - systems with higher
+    condition numbers take longer to solve accurately.
+
+    Returns:
+        If not full_output: just the optimal x.
+        If full_output: optimal x, num iterations taken, success.
     """
-    placeholder
-    """
-    pass
+    #tol *= la.norm(A)
+
+    m, n = len(A), len(A.T)
+
+    if x is None:
+        x = np.random.randn(n)
+
+    # d: first search direction (same as initial residual)
+    d = b - np.dot(A, x) # d(0) = r(0) = b - Ax(0)
+    r = d                # from eq. (45)
+
+    for i in range(numIter):
+        #if (i % 2) == 0:
+        if 0:
+            print(('r(%d): ' + str(r)) % i)
+            recalc_r = b - np.dot(A, x)
+            print('recalc: ' + str(recalc_r))
+            print('resid dif: %f' % la.norm(r - recalc_r))
+            #raw_input()
+
+
+        a = np.dot(r.T, r) / np.dot(d.T, np.dot(A, d)) # eq. (46)
+
+        x += a * d
+
+        new_r = r - (a * np.dot(A, d)) # calculate new residual (A-orthogonal to
+                                       # previous except d)      (eq. 47)
+
+        beta = np.dot(new_r.T, new_r) / np.dot(r.T, r) # eq. (48)
+
+        d = new_r + beta * d
+        r = new_r
+
+        if la.norm(b - np.dot(A, x)) < tol:
+            print('Close enough at iter %d' % i)
+            if full_output:
+                return x, i, True
+            else:
+                return x
+
+    print('Max iteration reached (%d)' % numIter)
+    if full_output:
+        return x, numIter, True
+    else:
+        return x
+
+
+
+
+
+
 
 def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
     '''
@@ -203,7 +258,8 @@ def iter_refinement(A, b, tol=0.001, maxIter=500, x0=None, debug=False):
         r = b - np.dot(A, x)
 
         # Solve the system (Ad = r) for d
-        result = scopt.minimize(fun=norm_dif, x0=np.random.randn(m), args=(A, r), method='CG')
+        result = scopt.minimize(fun=norm_dif, x0=np.random.randn(m), \
+                                args=(A, r), method='CG')
         d, success, msg = result.x, result.success, result.message
         if debug: print(success, msg)
         # TODO: find out which method is best/quickest to solve this
@@ -214,3 +270,6 @@ def iter_refinement(A, b, tol=0.001, maxIter=500, x0=None, debug=False):
             break
 
     return x
+
+def continuation():
+    pass

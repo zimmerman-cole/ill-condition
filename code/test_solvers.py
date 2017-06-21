@@ -1,9 +1,9 @@
 import numpy as np
 import numpy.linalg as la
-import time
+import time, sys
 from scipy import optimize as scopt
 from scipy.sparse import linalg as scla
-import util
+import util, optimize
 
 def func(x, *args):
     """
@@ -16,6 +16,10 @@ def func(x, *args):
     return la.norm(b - np.dot(A, x))
 
 def test_cg_linear(cond_num, m, n, num_samples=20, verbose=0):
+    """
+    Test scipy.sparse.linalg.cg(...).
+    DOESN'T CURRENTLY WORK.
+    """
     st_time = time.time()
     improvements = []
 
@@ -31,7 +35,7 @@ def test_cg_linear(cond_num, m, n, num_samples=20, verbose=0):
 
 
         init_error = 100.0 * la.norm(x0 - true_x) #/ float(la.norm(true_x))), 2)
-        print()
+        if verbose >= 2: print
         opt_error = 100.0 * la.norm(xopt - true_x) #/ float(la.norm(la.norm(true_x)))), 2)
 
         improvements.append(init_error - opt_error)
@@ -127,7 +131,7 @@ def test_minres(cond_num, n, shift, num_samples=20, verbose=0):
     Returns:
         (float) average time required to solve one Ax=b.
         (float) average percent error improvement (lowering ||b - Ax|| / ||b||)
-    
+
     Examples:
         (1)       no shift:   test_minres(cond_num=20, n=50, shift = 0, num_samples=20, verbose=2)
         (2)      yes shift:   test_minres(cond_num=20, n=50, shift = -3, num_samples=20, verbose=2)
@@ -135,7 +139,7 @@ def test_minres(cond_num, n, shift, num_samples=20, verbose=0):
 
     abs_improvements = []  # absolute improvement (reduction) in absolute error
     pct_improvements = []  # %-age improvement (reduction) in absolute error
-    
+
     st_time = time.time()
 
     for _ in range(num_samples):
@@ -149,7 +153,7 @@ def test_minres(cond_num, n, shift, num_samples=20, verbose=0):
         # randomly generate initial start
         x0 = np.random.randn(n)
         xopt,info = scla.minres(A,b)
-        
+
 
         init_error = la.norm(x0 - true_x) #/ float(la.norm(true_x))), 2)
         opt_error = la.norm(xopt - true_x) #/ float(la.norm(la.norm(true_x)))), 2)
@@ -178,3 +182,56 @@ def test_minres(cond_num, n, shift, num_samples=20, verbose=0):
         # print('0: %d   1: %d    2: %d' % (flags[0], flags[1], flags[2]))
 
     return avg_time, avg_pct_improv
+
+def test_cg(n, cond_num=50, tol=0.000001, num_samples=20, verbose=0):
+    """
+    Test optimize.conjugate_gradient_ideal(...).
+    Behaviour is as expected - systems with higher
+    condition numbers take longer to solve accurately.
+    """
+
+    # Average number of iterations needed to solve system to
+    # specified tolerance
+    avg_iter = 0
+
+    for _ in range(num_samples):
+        sys.stdout.write('Sample %d: ' % (_+1))
+        # symmetric, positive-definite
+        A = util.mat_from_cond(cond_num, m=n, n=n)
+        A = np.dot(A, A.T)
+
+        true_x = np.random.randn(n) + 5
+        b = np.dot(A, true_x)
+
+        x = np.random.randn(n)
+
+        if verbose >= 1: print('Initial error: %f' % la.norm(true_x - x))
+        x, n_iter, success = optimize.conjugate_gradient_ideal(A, b, tol=0.000001, x=x, full_output=True)
+        if verbose >= 1: print('Final error: %f' % la.norm(true_x - x))
+
+        avg_iter += n_iter
+
+    avg_iter /= float(num_samples)
+
+    print('Average n_iter needed for condition number ~%d: %f' % (cond_num, avg_iter))
+
+def test_iter_refine(m, n, cond_num = 25, num_samples=20):
+    """
+    Test optimize.iter_refinement(...).
+    UNFINISHED TESTING.
+    """
+
+
+    for _ in range(num_samples):
+        print('Sample %d =========' % _)
+        A = util.mat_from_cond(cond_num, m=m, n=n)
+        true_x = np.random.randn(n) + 5
+        b = np.dot(A, true_x)
+
+        x = np.random.randn(n) + 4
+
+        st_time = time.time()
+        print('Initial error: %f' % la.norm(true_x - x))
+        x = optimize.iter_refinement(A, b, x0=x, debug=0)
+        print('Final error: %f' % la.norm(true_x - x))
+        print('Time taken: %f seconds' % (time.time() - st_time))
