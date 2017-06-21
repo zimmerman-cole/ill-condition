@@ -110,3 +110,71 @@ def test_cg_nonlinear(cond_num, m, n, num_samples=20, verbose=0):
         print('0: %d   1: %d    2: %d' % (flags[0], flags[1], flags[2]))
 
     return avg_time, avg_improv
+
+def test_minres(cond_num, n, shift, num_samples=20, verbose=0):
+    """
+    Test accuracy of scla.minres optimization function on symmetric PSD matricies
+    with specified condition number.
+
+    Args:
+        (int)    cond_num:   Desired condition number.
+        (int)           m:   Desired number of rows.
+        (int)           n:   Desired number of columns.
+        (int) num_samples:   Desired number of distinct matrices with condition
+                                number cond_num to test minres.
+        (float)     shift:   Desired regularization shift.
+
+    Returns:
+        (float) average time required to solve one Ax=b.
+        (float) average percent error improvement (lowering ||b - Ax|| / ||b||)
+    
+    Examples:
+        (1)       no shift:   test_minres(cond_num=20, n=50, shift = 0, num_samples=20, verbose=2)
+        (2)      yes shift:   test_minres(cond_num=20, n=50, shift = -3, num_samples=20, verbose=2)
+    """
+
+    abs_improvements = []  # absolute improvement (reduction) in absolute error
+    pct_improvements = []  # %-age improvement (reduction) in absolute error
+    
+    st_time = time.time()
+
+    for _ in range(num_samples):
+        # randomly generate A
+        A = util.psd_with_cond(cond_num, n)
+
+        # randomly generate true x.
+        true_x = np.random.randn(n)
+        b = np.dot(A, true_x)
+
+        # randomly generate initial start
+        x0 = np.random.randn(n)
+        xopt,info = scla.minres(A,b)
+        
+
+        init_error = la.norm(x0 - true_x) #/ float(la.norm(true_x))), 2)
+        opt_error = la.norm(xopt - true_x) #/ float(la.norm(la.norm(true_x)))), 2)
+        pct_error = 100*(init_error - opt_error)/init_error
+
+        abs_improvements.append(init_error - opt_error)
+        pct_improvements.append(100*abs_improvements[_]/init_error)
+
+        if verbose >= 2:
+            print('==== Sample %d ==============================' % _)
+            print('Condition number of A: %f' % la.cond(A))
+            print('Initial absolute error: %f' % init_error)
+            print('Final (optimized) absolute error: %f' % opt_error)
+            print('Percent reduction in abs error: %f' % pct_error)
+            print('')
+
+    avg_time = (time.time() - st_time) / float(num_samples)
+    avg_abs_improv = round((sum(abs_improvements) / float(num_samples)), 2)
+    avg_pct_improv = round((sum(pct_improvements) / float(num_samples)), 2)
+
+    if verbose >= 1:
+        print('Processing %d samples in which A has dimensions (%d by %d)' % (num_samples, n, n))
+        print('Average time to solve system one time: %f seconds.' % avg_time)
+        print('Average absolute improvement: %f' % avg_abs_improv)
+        print('Average percent improvement: %f%%' % avg_pct_improv)
+        # print('0: %d   1: %d    2: %d' % (flags[0], flags[1], flags[2]))
+
+    return avg_time, avg_pct_improv
