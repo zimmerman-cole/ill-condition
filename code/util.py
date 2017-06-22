@@ -104,31 +104,36 @@ def ghetto_command_line():
         except BaseException:
             traceback.print_exc()
 
+def scratch():
+    A = psd_with_cond(cond_num=55,n=2)
+    x_true = np.random.randn(2)
+    b = np.dot(A,x_true)
+    evals,evecs = la.eig(A)
+    print('eigenvalues are: %s' % evals)
 
-A = psd_with_cond(cond_num=55,n=2)
-x_true = np.random.randn(2)
-b = np.dot(A,x_true)
-evals,evecs = la.eig(A)
-print(evals)
+    x_opt = gradient_descent(A,b)
+    # print(la.norm(x_true-x_opt))
 
-x_opt = gradient_descent(A,b)
-print(la.norm(x_true-x_opt))
+    num = 100
+    # x1 = x2 = np.linspace(-evals[1], evals[0], num)
+    x1 = x2 = np.linspace(-3, 3, num)
+    x1v, x2v = np.meshgrid(x1, x2, indexing='ij', sparse=False)
+    hv = np.zeros([num,num])
 
-num = 100
-x1 = x2 = np.linspace(-4., 4., num)
-x1v, x2v = np.meshgrid(x1, x2, indexing='ij', sparse=False)
-hv = np.zeros([num,num])
+    for i in range(len(x1)):
+        for j in range(len(x2)):
+            # hv[i,j] = la.norm(np.dot(A,[x1v[i,j],x2v[i,j]])-b)
+            xx = np.array([x1v[i,j],x2v[i,j]])
+            hv[i,j] = np.dot(xx.T,np.dot(A,xx))-np.dot(b.T,xx)
 
-for i in range(len(x1)):
-    for j in range(len(x2)):
-        # hv[i,j] = la.norm(np.dot(A,[x1v[i,j],x2v[i,j]])-b)
-        xx = np.array([x1v[i,j],x2v[i,j]])
-        hv[i,j] = np.dot(xx.T,np.dot(A,xx))-np.dot(b.T,xx)
-
-print(hv)
-fig = plt.figure(1)
-ax = fig.gca()
-ax.contour(x1v, x2v, hv)
-plt.axis('equal')
-plt.show()
+    print(hv)
+    fig = plt.figure(1)
+    ax = fig.gca()
+    # ax.contour(x1v, x2v, hv,50)
+    ll = np.linspace(0.001,4,20)
+    ll = 10**ll
+    cs = ax.contour(x1v, x2v, hv,levels=ll)
+    plt.clabel(cs)
+    plt.axis('equal')
+    plt.show()
 
