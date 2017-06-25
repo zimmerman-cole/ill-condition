@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
+import util, optimize
 
 def norm_dif(x, *args):
     """
@@ -33,14 +34,14 @@ def visual_gd():
     """
     Visualized gradient descent.
     """
-    A = psd_with_cond(cond_num=1000,n=2)
+    A = util.psd_with_cond(cond_num=1000,n=2)
     x_true = np.random.randn(2)
     b = np.dot(A,x_true)
     evals,evecs = la.eig(A)
     #print('eigenvalues are: %s' % evals)
 
     x_opt = optimize.gradient_descent(A,b, x=np.array([2.0,2.0]))
-    path = visual.gd_path(A, b, x=np.array([2.0,2.0]))
+    path = gd_path(A, b, x=np.array([2.0,2.0]))
     #print(path[0])
     span = np.sqrt((path[0][0] - x_opt[0])**2 + (path[0][1] - x_opt[1])**2)
     # print(la.norm(x_true-x_opt))
