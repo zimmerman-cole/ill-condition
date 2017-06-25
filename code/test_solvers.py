@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as la
+import matplotlib.pyplot as plt
 import time, sys
 from scipy import optimize as scopt
 from scipy.sparse import linalg as scla
@@ -232,6 +233,40 @@ def test_iter_refine(m, n, cond_num = 25, num_samples=20):
 
         st_time = time.time()
         print('Initial error: %f' % la.norm(true_x - x))
-        x = optimize.iter_refinement(A, b, x0=x, debug=0)
+        x = optimize.iter_refinement(A, b, x=x)
         print('Final error: %f' % la.norm(true_x - x))
         print('Time taken: %f seconds' % (time.time() - st_time))
+
+def test_all_symmetric_pos_def(n, cond_num = 100):
+    """
+    Test algorithms' performances on a SYMMETRIC, POSITIVE-DEFINITE matrix
+        of given size and condition number.
+    """
+
+    n_iter = 100
+
+    A = util.psd_with_cond(cond_num, n=n)
+    true_x = 4 * np.random.randn(n)
+    b = np.dot(A, true_x)
+
+    #x = np.zeros(n) # Conjugate gradients
+    cg_results = optimize.conjugate_gradient_ideal(A, b, numIter=n_iter, full_output=True)
+    #x = np.zeros(n) # Gradient descent
+    gd_results = optimize.gradient_descent(A, b, numIter=n_iter, full_output=True)
+    #x = np.zeros(n)
+    ir_results = optimize.iter_refinement(A, b, numIter=n_iter, full_output=True)
+
+    plt.plot(cg_results[3], marker='o')
+    plt.plot(gd_results[3], marker='o')
+    plt.plot(ir_results[3], marker='o')
+
+
+    plt.xlabel('Iteration')
+    plt.ylabel('Residual ||Ax - b||')
+    plt.yscale('log')
+    plt.legend(['CG', 'GD', 'IR'])
+    if type(cond_num) == float:
+        plt.title('dim(A): %dx%d. cond(A): %.2f' % (n, n, round(cond_num, 2)))
+    else:
+        plt.title('dim(A): %dx%d. cond(A): %d' % (n, n, cond_num))
+    plt.show()
