@@ -1,12 +1,12 @@
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
-import time, sys
+import time, sys, util, optimize
 from scipy import optimize as scopt
 from scipy.sparse import linalg as scla
-import util, optimize
 
-def func(x, *args):
+
+def norm_dif(x, *args):
     """
     Pass to scipy optimizer (to solve Ax=b):
         args[0]: A
@@ -91,7 +91,7 @@ def test_cg_nonlinear(cond_num, m, n, num_samples=20, verbose=0):
         b = np.dot(A, true_x)
 
         x0 = np.random.randn(n)
-        xopt, fopt, func_calls, grad_calls, warnflag = scopt.fmin_cg(f=func, x0=x0, args=(A, b), full_output=True)
+        xopt, fopt, func_calls, grad_calls, warnflag = scopt.fmin_cg(f=norm_dif, x0=x0, args=(A, b), full_output=True)
         flags[warnflag] += 1
 
         init_error = 100.0 * la.norm(x0 - true_x) #/ float(la.norm(true_x))), 2)
@@ -237,11 +237,15 @@ def test_iter_refine(m, n, cond_num = 25, num_samples=20):
         print('Final error: %f' % la.norm(true_x - x))
         print('Time taken: %f seconds' % (time.time() - st_time))
 
+# DEPRECATED
 def test_all_symmetric_pos_def(n, cond_num = 100, n_iter=100):
     """
     Test algorithms' performances on a SYMMETRIC, POSITIVE-DEFINITE matrix
         of given size and condition number.
+    Old
     """
+
+    print('Just use test_solvers.test_all() please')
 
     A = util.psd_from_cond(cond_num, n=n)
     true_x = 4 * np.random.randn(n) # 'magic' number
@@ -271,25 +275,39 @@ def test_all_symmetric_pos_def(n, cond_num = 100, n_iter=100):
 
 def test_all(m, n, cond_num = 100, n_iter = 100):
     A = util.mat_from_cond(cond_num=cond_num, m=m, n=n)
-    true_x = 4 * np.random.randn(n) # 'magic' number
+    true_x = 4 * np.random.randn(n) # 4 is 'magic' number
     b = np.dot(A, true_x)
+    print('Initial absolute error: %f' % norm_dif(np.zeros(n), A, b) )
 
     # Conjugate gradients
+    start = time.time()
     cg_results = optimize.conjugate_gradient(A, b, numIter=n_iter, full_output=True)
+    print('CG took %f seconds' % (time.time() - start))
+    #cg_final_err = norm_dif(cg_results[0], A, b)
+    #print('CG final error: %f' % cg_final_err )
+
     # Gradient descent
-    gd_results = optimize.gradient_descent(A, b, numIter=n_iter, full_output=True)
+    #start = time.time()
+    #gd_results = optimize.gradient_descent(A, b, numIter=n_iter, full_output=True)
+    #print('GD took %f seconds' % (time.time() - start))
+    #print('GD final error: %f' % norm_dif(gd_results[0], A, b) )
+
     # Iterative refinement
+    start = time.time()
     ir_results = optimize.iter_refinement(A, b, numIter=n_iter, full_output=True)
+    print('IR took %f seconds' % (time.time() - start))
+    #ir_final_err = norm_dif(ir_results[0], A, b)
+    #print('IR final error: %f' % ir_final_err )
 
     plt.plot(cg_results[3], marker='o')
-    plt.plot(gd_results[3], marker='o')
+    #plt.plot(gd_results[3], marker='o')
     plt.plot(ir_results[3], marker='o')
 
 
     plt.xlabel('Iteration')
     plt.ylabel('Residual ||Ax - b||')
     plt.yscale('log')
-    plt.legend(['CG', 'GD', 'IR'])
+    plt.legend(['CG', 'IR'])
     if type(cond_num) == float:
         plt.title('dim(A): %dx%d. cond(A): %.2f' % (n, n, round(cond_num, 2)))
     else:

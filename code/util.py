@@ -24,7 +24,7 @@ def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
     if cond_num < 1:
         raise la.linAlgError('Condition number must be greater than or equal to 1')
 
-    if min_sing == None:
+    if min_sing is None:
         min_sing = abs(np.random.randn())
 
     max_sing = min_sing * float(cond_num)
@@ -72,7 +72,7 @@ def psd_from_cond(cond_num, n=50, min_sing=None):
         If you leave min_sing==None, it returns a positive-definite matrix.
         If min_sing < 0, it returns a negative-definite matrix.
     """
-    if min_sing == None:
+    if min_sing is None:
         min_sing = abs(np.random.randn())
 
     max_sing = min_sing * float(np.sqrt(cond_num))

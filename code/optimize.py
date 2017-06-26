@@ -1,8 +1,6 @@
 import numpy as np
 import numpy.linalg as la
-import traceback
-import sys
-import scipy
+import traceback, sys, scipy
 from scipy import optimize as scopt
 
 
@@ -16,9 +14,8 @@ def norm_dif(x, *args):
 # baseline
 def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=False):
     """
-    Standard gradient descent for SYMMETRIC,
-    POSITIVE-DEFINITE matrices.
-    Needs thorough testing.
+    Standard gradient descent for SYMMETRIC, POSITIVE-DEFINITE matrices.
+    ## TODO: fix weird zigzag behaviour.
 
     Re-calculates residual EVERY iteration (so slow but a bit more accurate).
 
@@ -32,11 +29,9 @@ def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=Fals
         argmin(x) ||Ab - x||.
     """
     n = len(A)
-    if x is None:
-        x = np.zeros(n)
+    if x is None: x = np.zeros(n)
 
-    if full_output:
-        resids = []
+    if full_output: resids = []
 
     # Start descent
     for i in range(numIter):
@@ -56,12 +51,14 @@ def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=Fals
         if la.norm(b - np.dot(A, x)) < tol:
             print('GD: Close enough at iter %d' % i)
             if full_output:
+                resids.append(norm_dif(x, A, b))
                 return x, i, True, resids
             else:
                 return x
 
     print('GD: Max iteration reached (%d)' % numIter)
     if full_output:
+        resids.append(norm_dif(x, A, b))
         return x, numIter, False, resids
     else:
         return x
@@ -70,7 +67,7 @@ def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=Fals
 def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
     """
     Implementation of gradient descent for PSD matrices.
-    
+
     Notes:
         Needs thorough testing.
         Re-calculate residual EVERY iteration (so slow but a bit more accurate).
@@ -87,13 +84,13 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
     Returns:
         argmin(x) ||Ax - b||_2.
     """
-    
+
     n = len(A)
-    
+
     # Ensure sound inputs
     assert len(A.T) == n
     assert len(b) == n
-    
+
     # Working with (n, ) vectors, not (n, 1)
     if len(b.shape) == 2: b = b.reshape(n, )
     if x0 is None:
@@ -169,6 +166,8 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
 
 # modifications: 1 matrix-vector multiplication per iteration; nonsymmetric (square) matrix A
 
+
+
 def conjugate_gs(u, A):
     """
     Conjugate Gram-Schmidt process.
@@ -241,6 +240,8 @@ def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_outp
     condition numbers. Behaviour is as expected - systems with higher
     condition numbers take longer to solve accurately.
 
+    TODO: fix residual error accumulation
+
     Returns:
         If not full_output: just the optimal x.
         If full_output: optimal x, num iterations taken, success, residuals plot.
@@ -263,6 +264,7 @@ def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_outp
         if full_output:
             resids.append(norm_dif(x, A, b))
 
+        # TODO: recalculate residual here every _ iters to avoid accumulating error
         # if 0:
         #     print(('r(%d): ' + str(r)) % i)
         #     recalc_r = b - np.dot(A, x)
@@ -285,12 +287,14 @@ def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_outp
         if la.norm(b - np.dot(A, x)) < tol:
             print('CG: Close enough at iter %d' % i)
             if full_output:
+                resids.append(norm_dif(x, A, b))
                 return x, i, True, resids
             else:
                 return x
 
     print('CG: Max iteration reached (%d)' % numIter)
     if full_output:
+        resids.append(norm_dif(x, A, b))
         return x, numIter, False, resids
     else:
         return x
@@ -354,10 +358,10 @@ def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
 
     return x
 
+# TODO: add epsilon diagonal stuff
 def iter_refinement(A, b, tol=0.001, numIter=500, x=None, full_output=False):
     """
     Iterative refinement method.
-    Use as a sort of postprocessing to fix round-off error?
 
     https://en.wikipedia.org/wiki/Iterative_refinement
 
@@ -394,12 +398,14 @@ def iter_refinement(A, b, tol=0.001, numIter=500, x=None, full_output=False):
         if la.norm(b - np.dot(A, x)) < tol:
             print('IR: Close enough at iter %d' % i)
             if full_output:
+                resids.append(norm_dif(x, A, b))
                 return x, i, True, resids
             else:
                 return x
 
     print('IR: Max iteration reached (%d)' % numIter)
     if full_output:
+        resids.append(norm_dif(x, A, b))
         return x, numIter, False, resids
     else:
         return x
