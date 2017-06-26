@@ -176,7 +176,7 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
 def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
     """
     Implementation of gradient descent for nonsymmetric matrices (or symmetric, but slow in this case).
-    
+
     Notes:
         Needs thorough testing; error BLOW UP
         Re-calculate residual EVERY iteration (so slow but a bit more accurate).
@@ -193,13 +193,13 @@ def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500,
     Returns:
         argmin(x) ||Ax - b||_2.
     """
-    
+
     n = len(A)
-    
+
     # Ensure sound inputs
     assert len(A.T) == n
     assert len(b) == n
-    
+
     # Working with (n, ) vectors, not (n, 1)
     if len(b.shape) == 2: b = b.reshape(n, )
     if x0 is None:
@@ -210,7 +210,7 @@ def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500,
 
     # diagnostics
     x_hist = []
-    
+
     if full_output:
         resids = []
 
@@ -222,7 +222,7 @@ def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500,
     a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
     r_new = r_curr - a*Ar_curr
     x += a * r_curr
-    
+
     if full_output:
         x_hist.append(x)
         if x_tru is not None:
@@ -241,11 +241,11 @@ def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500,
         AA = 1/2*A+A.T
         Ar_curr = np.inner(AA, r_curr)
         a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
-        
+
         # updates
         x += a * r_curr
         x_hist.append(x)
-        
+
         # calculate residuals for next step
         if _ % recalc == 0:
             r_new = b - np.dot(AA, x)
@@ -434,6 +434,9 @@ def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_outpu
 
         r = b - np.dot(A, x)
 
+        # break if residual blows up (becomes nan)
+        if la.norm(r) != la.norm(r):
+            break
 
         if full_output:
             resids[time.time() - start_time] = la.norm(r)

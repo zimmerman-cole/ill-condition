@@ -334,12 +334,10 @@ def test_all_time(m, n, cond_num = 100, n_iter = 100):
     # Iterative refinement w/ epsilon smoothing
     st_time = time.time()
     ir_results = optimize.iter_refinement_eps(A, b, numIter=n_iter, full_output=True)
-    #print('IR_eps final error: %f' % ir_results[3][next(reversed(ir_results[3]))])
     print(norm_dif(ir_results[0], A, b))
     print('IR_eps took %f seconds' % (time.time() - st_time))
 
     plt.scatter(cg_results[3].keys(), cg_results[3].values(), marker='x')
-    #plt.plot(ir_results_old[3].keys(), ir_results_old[3].values(), marker='x')
     plt.scatter(ir_results[3].keys(), ir_results[3].values(), marker='o')
 
 
@@ -347,7 +345,6 @@ def test_all_time(m, n, cond_num = 100, n_iter = 100):
     plt.ylabel('Residual ||Ax - b||')
     plt.yscale('log')
     plt.legend(['CG', 'IR_eps'])
-    #plt.legend(['CG', 'IR'])
     if type(cond_num) == float:
         plt.title('dim(A): %dx%d. cond(A): %.2f' % (n, n, round(cond_num, 2)))
     else:
@@ -371,4 +368,33 @@ def test_all_time(m, n, cond_num = 100, n_iter = 100):
     #         break
     #     except BaseException:
     #         traceback.print_exc()
-    #plt.show()
+    plt.show()
+
+# Gather data on weird iter_refine_eps
+def gather_IR_data(m, n, cond_num = 100, n_iter = 100, n_mats=100):
+    """
+    Gather and save data for testing with iter_refinement_eps.
+    Calling this method overwrites old data.
+    """
+
+    for i in range(n_mats):
+        A = util.mat_from_cond(cond_num, m, n)
+        true_x = 4 * np.random.randn(n)
+        b = np.dot(A, true_x)
+        init_err = norm_dif(np.zeros(n), A, b)
+        print('Initial absolute error: %f' % init_err)
+
+        st_time = time.time()
+        res = optimize.iter_refinement_eps(A, b, full_output=True)
+        print('Took %f seconds' % (time.time() - st_time))
+
+        # A b; b is saved as column and appended onto A
+        to_save = np.append(A, b.reshape(m, 1), axis=1)
+        # ones that didn't blow up
+        if norm_dif(res[0], A, b) <= 0.99 * init_err:
+            path_ = '../test_results/iter_refine_eps/converges/m%d' % i
+            np.save(path_, to_save)
+        else:
+            # ones that did
+            path_ = '../test_results/iter_refine_eps/blows_up/m%d' % i
+            np.save(path_, to_save)
