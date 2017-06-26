@@ -145,7 +145,7 @@ def test_minres(cond_num, n, shift, num_samples=20, verbose=0):
 
     for _ in range(num_samples):
         # randomly generate A
-        A = util.psd_with_cond(cond_num, n)
+        A = util.psd_from_cond(cond_num, n)
 
         # randomly generate true x.
         true_x = np.random.randn(n)
@@ -243,7 +243,7 @@ def test_all_symmetric_pos_def(n, cond_num = 100, n_iter=100):
         of given size and condition number.
     """
 
-    A = util.psd_with_cond(cond_num, n=n)
+    A = util.psd_from_cond(cond_num, n=n)
     true_x = 4 * np.random.randn(n) # 'magic' number
     b = np.dot(A, true_x)
 

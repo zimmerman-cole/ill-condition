@@ -34,7 +34,7 @@ def visual_gd():
     """
     Visualized gradient descent.
     """
-    A = util.psd_with_cond(cond_num=1000,n=2)
+    A = util.psd_from_cond(cond_num=1000,n=2)
     x_true = np.random.randn(2)
     b = np.dot(A,x_true)
     evals,evecs = la.eig(A)
