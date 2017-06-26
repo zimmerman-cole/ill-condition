@@ -4,6 +4,9 @@ import traceback, sys, scipy, time
 from scipy import optimize as scopt
 from collections import OrderedDict
 
+# TODO: currently all (?) methods calculate residual an extra time each iteration
+#               (when checking if resid norm is within tolerance range)
+
 # || b - Ax ||
 def norm_dif(x, *args):
     """
@@ -328,14 +331,12 @@ def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_outp
         r = new_r
 
         if la.norm(b - np.dot(A, x)) < tol:
-            print('CG: Close enough at iter %d' % i)
             if full_output:
                 resids[time.time() - start_time] = norm_dif(x, A, b)
                 return x, i, True, resids
             else:
                 return x
 
-    print('CG: Max iteration reached (%d)' % numIter)
     if full_output:
         resids[time.time() - start_time] = norm_dif(x, A, b)
         return x, numIter, False, resids
@@ -378,11 +379,12 @@ def iter_refinement(A, b, tol=0.001, numIter=500, x=None, full_output=False):
 
     for i in range(numIter):
         #print('Iter %d' % i)
-        if full_output:
-            resids[time.time() - start_time] = norm_dif(x, A, b)
 
         # Compute the residual r
         r = b - np.dot(A, x)
+
+        if full_output:
+            resids[time.time() - start_time] = la.norm(r)
 
         # Solve the system (Ad = r) for d
         result = scopt.minimize(fun=norm_dif, x0=np.random.randn(m), \
@@ -408,8 +410,58 @@ def iter_refinement(A, b, tol=0.001, numIter=500, x=None, full_output=False):
     else:
         return x
 
-def continuation():
-    pass
+def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_output=False):
+    """
+    Iterative refinement with epsilon smoothing.
+
+    e: epsilon, value added to diagonal of A to lower condition number (decreases
+                    w/ each iteration)
+    """
+    m, n = len(A), len(A.T)
+    min_dim = min(m, n)
+    if x is None:
+        x = np.zeros(n)
+    if e is None:
+        e = la.cond(A) * 3
+
+    min_err = (np.copy(x), norm_dif(x, A, b))
+
+    if full_output:
+        resids = OrderedDict()
+        start_time = time.time()
+
+    for i in range(1,numIter+1):
+
+        r = b - np.dot(A, x)
+
+
+        if full_output:
+            resids[time.time() - start_time] = la.norm(r)
+
+        # exit if close enough
+        if la.norm(r) < tol:
+            if full_output:
+                return min_err[0], i, True, resids
+            else:
+                return min_err[0]
+
+        A_e = np.copy(A)
+        A_e[:min_dim, :min_dim] += (e / (2.0*i)*np.identity(min_dim))
+
+        d = conjugate_gradient(A_e, r, x)
+
+        x += d
+
+        if norm_dif(x, A, b) < min_err[1]: min_err = (np.copy(x), norm_dif(x, A, b))
+
+
+    #print('IR: Max iteration reached (%d)' % numIter)
+    if full_output:
+        resids[time.time() - start_time] = norm_dif(x, A, b)
+        return min_err[0], numIter, False, resids
+    else:
+        return min_err[0]
+
 
 # ==============================================================================
 
@@ -522,3 +574,45 @@ def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
             break
 
     return x
+
+# ==============================================================================
+# trash (we may find useful in the future somehow) below
+
+# def gradient_descent_helper(A, b, x, alpha=0.01, tol=0.1, verbose=0):
+#     """
+#     Helper method for iter_refinement_eps (NOPE). Standard gradient descent that also
+#         works on non-symmetric matrices.
+#     """
+#     n_iter = 1
+#     start_time = time.time()
+#
+#     while 1:
+#         n_iter += 1
+#         if np.random.uniform() <= 0.00001:
+#             print('n_iter: %d' % n_iter)
+#             print(norm_dif(x, A, b))
+#
+#         err = np.dot(A, x) - b
+#         # check for nan
+#         if la.norm(err) != la.norm(err):
+#             print('something went horribly wrong in gradient_descent_helper')
+#             sys.exit(0)
+#
+#         # return if close enough
+#         if la.norm(err) < tol:
+#             break
+#
+#         gradient = np.dot(A.T, err) / len(A)
+#         # also return if not close enough, but gradient still ~= 0
+#         # (in case of overconstrained linear systems, for example)
+#         if la.norm(gradient) < 0.000001:
+#             break
+#
+#         # update
+#         x -= alpha * gradient
+#
+#     if verbose:
+#         print('n_iter: %d' % n_iter)
+#         print('time: %f' % (time.time() - start_time))
+#
+#     return x

@@ -316,31 +316,59 @@ def test_all(m, n, cond_num = 100, n_iter = 100):
 
 # Plot residuals vs time at each iteration
 def test_all_time(m, n, cond_num = 100, n_iter = 100):
+    """
+    TODO: study IR w/ epsilon smoothing stuff
+    """
+
     A = util.mat_from_cond(cond_num=cond_num, m=m, n=n)
     true_x = 4 * np.random.randn(n) # 4 is 'magic' number
     b = np.dot(A, true_x)
     print('Initial absolute error: %f' % norm_dif(np.zeros(n), A, b) )
 
     # Conjugate gradients
+    st_time = time.time()
     cg_results = optimize.conjugate_gradient(A, b, numIter=n_iter, full_output=True)
     print('CG final error: %f' % cg_results[3][next(reversed(cg_results[3]))] )
+    print('CG took %f seconds' % (time.time() - st_time))
 
-    # Iterative refinement
-    ir_results = optimize.iter_refinement(A, b, numIter=n_iter, full_output=True)
-    print('IR final error: %f' % ir_results[3][next(reversed(ir_results[3]))] )
+    # Iterative refinement w/ epsilon smoothing
+    st_time = time.time()
+    ir_results = optimize.iter_refinement_eps(A, b, numIter=n_iter, full_output=True)
+    #print('IR_eps final error: %f' % ir_results[3][next(reversed(ir_results[3]))])
+    print(norm_dif(ir_results[0], A, b))
+    print('IR_eps took %f seconds' % (time.time() - st_time))
 
-    plt.scatter(cg_results[3].keys(), cg_results[3].values(), marker='o')
+    plt.scatter(cg_results[3].keys(), cg_results[3].values(), marker='x')
+    #plt.plot(ir_results_old[3].keys(), ir_results_old[3].values(), marker='x')
     plt.scatter(ir_results[3].keys(), ir_results[3].values(), marker='o')
 
 
     plt.xlabel('Time')
-    #plt.xscale('log')
     plt.ylabel('Residual ||Ax - b||')
     plt.yscale('log')
-    #plt.legend(['CG'])
-    plt.legend(['CG', 'IR'])
+    plt.legend(['CG', 'IR_eps'])
+    #plt.legend(['CG', 'IR'])
     if type(cond_num) == float:
         plt.title('dim(A): %dx%d. cond(A): %.2f' % (n, n, round(cond_num, 2)))
     else:
         plt.title('dim(A): %dx%d. cond(A): %d' % (n, n, cond_num))
-    plt.show()
+
+
+
+    # num_mem = 100 # number of past commands to remember
+    # past_commands = []
+    # while True:
+    #     try:
+    #         sys.stdout.write('>>> ')
+    #         inp = raw_input()
+    #         if inp=='continue':
+    #             break
+    #         else:
+    #             past_commands.append(inp)
+    #             exec(inp)
+    #     except KeyboardInterrupt:
+    #         print('')
+    #         break
+    #     except BaseException:
+    #         traceback.print_exc()
+    #plt.show()
