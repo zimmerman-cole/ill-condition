@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import time, sys, util, optimize
 from scipy import optimize as scopt
 from scipy.sparse import linalg as scla
+from collections import OrderedDict
 
 
 def norm_dif(x, *args):
@@ -237,7 +238,8 @@ def test_iter_refine(m, n, cond_num = 25, num_samples=20):
         print('Final error: %f' % la.norm(true_x - x))
         print('Time taken: %f seconds' % (time.time() - st_time))
 
-# DEPRECATED
+# DOESN'T WORK ANYMORE (DEPRECATED) (plots resids versus iter. num)
+# TODO: FIX
 def test_all_symmetric_pos_def(n, cond_num = 100, n_iter=100):
     """
     Test algorithms' performances on a SYMMETRIC, POSITIVE-DEFINITE matrix
@@ -273,6 +275,13 @@ def test_all_symmetric_pos_def(n, cond_num = 100, n_iter=100):
         plt.title('dim(A): %dx%d. cond(A): %d' % (n, n, cond_num))
     plt.show()
 
+# ==============================================================================
+# RESIDUAL PLOTTING METHODS BELOW
+# ==============================================================================
+
+# TODO: make code below more readable
+
+# Plot residuals vs iteration number
 def test_all(m, n, cond_num = 100, n_iter = 100):
     A = util.mat_from_cond(cond_num=cond_num, m=m, n=n)
     true_x = 4 * np.random.randn(n) # 4 is 'magic' number
@@ -283,30 +292,52 @@ def test_all(m, n, cond_num = 100, n_iter = 100):
     start = time.time()
     cg_results = optimize.conjugate_gradient(A, b, numIter=n_iter, full_output=True)
     print('CG took %f seconds' % (time.time() - start))
-    #cg_final_err = norm_dif(cg_results[0], A, b)
-    #print('CG final error: %f' % cg_final_err )
-
-    # Gradient descent
-    #start = time.time()
-    #gd_results = optimize.gradient_descent(A, b, numIter=n_iter, full_output=True)
-    #print('GD took %f seconds' % (time.time() - start))
-    #print('GD final error: %f' % norm_dif(gd_results[0], A, b) )
+    print('CG final error: %f' % cg_results[3][next(reversed(cg_results[3])) ])
 
     # Iterative refinement
     start = time.time()
     ir_results = optimize.iter_refinement(A, b, numIter=n_iter, full_output=True)
     print('IR took %f seconds' % (time.time() - start))
-    #ir_final_err = norm_dif(ir_results[0], A, b)
-    #print('IR final error: %f' % ir_final_err )
+    print('IR final error: %f' % ir_results[3][next(reversed(ir_results[3])) ])
 
-    plt.plot(cg_results[3], marker='o')
-    #plt.plot(gd_results[3], marker='o')
-    plt.plot(ir_results[3], marker='o')
+    plt.plot(cg_results[3].values(), marker='o')
+    plt.plot(ir_results[3].values(), marker='o')
 
 
     plt.xlabel('Iteration')
     plt.ylabel('Residual ||Ax - b||')
     plt.yscale('log')
+    plt.legend(['CG', 'IR'])
+    if type(cond_num) == float:
+        plt.title('dim(A): %dx%d. cond(A): %.2f' % (n, n, round(cond_num, 2)))
+    else:
+        plt.title('dim(A): %dx%d. cond(A): %d' % (n, n, cond_num))
+    plt.show()
+
+# Plot residuals vs time at each iteration
+def test_all_time(m, n, cond_num = 100, n_iter = 100):
+    A = util.mat_from_cond(cond_num=cond_num, m=m, n=n)
+    true_x = 4 * np.random.randn(n) # 4 is 'magic' number
+    b = np.dot(A, true_x)
+    print('Initial absolute error: %f' % norm_dif(np.zeros(n), A, b) )
+
+    # Conjugate gradients
+    cg_results = optimize.conjugate_gradient(A, b, numIter=n_iter, full_output=True)
+    print('CG final error: %f' % cg_results[3][next(reversed(cg_results[3]))] )
+
+    # Iterative refinement
+    ir_results = optimize.iter_refinement(A, b, numIter=n_iter, full_output=True)
+    print('IR final error: %f' % ir_results[3][next(reversed(ir_results[3]))] )
+
+    plt.scatter(cg_results[3].keys(), cg_results[3].values(), marker='o')
+    plt.scatter(ir_results[3].keys(), ir_results[3].values(), marker='o')
+
+
+    plt.xlabel('Time')
+    #plt.xscale('log')
+    plt.ylabel('Residual ||Ax - b||')
+    plt.yscale('log')
+    #plt.legend(['CG'])
     plt.legend(['CG', 'IR'])
     if type(cond_num) == float:
         plt.title('dim(A): %dx%d. cond(A): %.2f' % (n, n, round(cond_num, 2)))

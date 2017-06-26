@@ -1,9 +1,10 @@
 import numpy as np
 import numpy.linalg as la
-import traceback, sys, scipy
+import traceback, sys, scipy, time
 from scipy import optimize as scopt
+from collections import OrderedDict
 
-
+# || b - Ax ||
 def norm_dif(x, *args):
     """
     Return || b - Ax || (Frobenius norm).
@@ -11,7 +12,7 @@ def norm_dif(x, *args):
     A, b = args
     return la.norm(b - np.dot(A, x))
 
-# baseline
+# baseline; for symmetric, positive-definite A
 def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=False):
     """
     Standard gradient descent for SYMMETRIC, POSITIVE-DEFINITE matrices.
@@ -31,14 +32,17 @@ def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=Fals
     n = len(A)
     if x is None: x = np.zeros(n)
 
-    if full_output: resids = []
+    if full_output:
+        resids = OrderedDict()
+        start_time = time.time()
 
     # Start descent
     for i in range(numIter):
-        #print('Iter %d' % i)
         if full_output:
-            resids.append(norm_dif(x, A, b))
+            resids[time.time() - start_time] = norm_dif(x, A, b)
 
+        # ACTUAL ALGORITHM
+        # ======================================================================
         # calculate residual (direction of steepest descent)
         r = b - np.dot(A, x)
 
@@ -47,18 +51,19 @@ def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=Fals
 
         # update x
         x += a * r
+        # ======================================================================
 
         if la.norm(b - np.dot(A, x)) < tol:
             print('GD: Close enough at iter %d' % i)
             if full_output:
-                resids.append(norm_dif(x, A, b))
+                resids[time.time() - start_time] = norm_dif(x, A, b)
                 return x, i, True, resids
             else:
                 return x
 
     print('GD: Max iteration reached (%d)' % numIter)
     if full_output:
-        resids.append(norm_dif(x, A, b))
+        resids[time.time() - start_time] = norm_dif(x, A, b)
         return x, numIter, False, resids
     else:
         return x
@@ -101,7 +106,7 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
 
     # diagnostics
     x_hist = []
-    
+
     if full_output:
         resids = []
 
@@ -112,7 +117,7 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
     a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
     r_new = r_curr - a*Ar_curr
     x += a * r_curr
-    
+
     if full_output:
         x_hist.append(x)
         if x_tru is not None:
@@ -130,11 +135,11 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
         # calculate step size (via analytic line search)
         Ar_curr = np.inner(A, r_curr)
         a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
-        
+
         # updates
         x += a * r_curr
         x_hist.append(x)
-        
+
         # calculate residuals for next step
         if _ % recalc == 0:
             r_new = b - np.dot(A, x)
@@ -166,35 +171,146 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
 
 # modifications: 1 matrix-vector multiplication per iteration; nonsymmetric (square) matrix A
 
-
-
-def conjugate_gs(u, A):
+# for symmetric, positive-definite A
+def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
     """
-    Conjugate Gram-Schmidt process.
-    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf
+    For SYMMETRIC, POSITIVE-DEFINITE matrices.
+    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf (p. 32)
 
-    Args:
-        (numpy.ndarray) u: array of n linearly independent column vectors.
-        (numpy.ndarray) A: matrix for vectors to be mutually conjugate to.
+    Tested on a handful of small (~50x50 - 500x500 matrices) w/ various
+    condition numbers. Behaviour is as expected - systems with higher
+    condition numbers take longer to solve accurately.
+
+    TODO: fix residual error accumulation
 
     Returns:
-        (numpy.ndarray) d: array of n mutually A-conjugate column vectors.
+        If not full_output: just the optimal x.
+        If full_output: optimal x, num iterations taken, success, residuals plot.
     """
-    n = len(u)
-    d = np.copy(u)
+    #tol *= la.norm(A)
 
-    for i in range(1, n):
-        for j in range(0,i):
+    m, n = len(A), len(A.T)
 
-            Adj = np.dot(A, d[:, j])
+    if x is None:
+        x = np.zeros(n)
+
+    # d: first search direction (same as initial residual)
+    d = b - np.dot(A, x) # d(0) = r(0) = b - Ax(0)
+    r = d                # from eq. (45)
+
+    if full_output:
+        resids = OrderedDict()
+        start_time = time.time()
+
+    for i in range(numIter):
+        if full_output:
+            resids[time.time() - start_time] = norm_dif(x, A, b)
+
+        # TODO: recalculate residual here every _ iters to avoid accumulating error
+        # if 0:
+        #     print(('r(%d): ' + str(r)) % i)
+        #     recalc_r = b - np.dot(A, x)
+        #     print('recalc: ' + str(recalc_r))
+        #     print('resid dif: %f' % la.norm(r - recalc_r))
 
 
-            Bij = -np.inner(u[:, i].T, Adj)
-            Bij /= np.inner(d[:, j].T, Adj) # (37)
+        a = np.dot(r.T, r) / np.dot(d.T, np.dot(A, d)) # eq. (46)
 
-            d[:, i] += np.dot(Bij, d[:, j]) # (36)
+        x += a * d
 
-    return d
+        new_r = r - (a * np.dot(A, d)) # calculate new residual (A-orthogonal to
+                                       # previous except d)      (eq. 47)
+
+        beta = np.dot(new_r.T, new_r) / np.dot(r.T, r) # eq. (48)
+
+        d = new_r + beta * d
+        r = new_r
+
+        if la.norm(b - np.dot(A, x)) < tol:
+            print('CG: Close enough at iter %d' % i)
+            if full_output:
+                resids[time.time() - start_time] = norm_dif(x, A, b)
+                return x, i, True, resids
+            else:
+                return x
+
+    print('CG: Max iteration reached (%d)' % numIter)
+    if full_output:
+        resids[time.time() - start_time] = norm_dif(x, A, b)
+        return x, numIter, False, resids
+    else:
+        return x
+
+# for any A
+def conjugate_gradient(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
+    """
+    Conjugate gradients on the normal equations.
+    (Page 41 in "Painless Conjugate Gradient")
+
+    A doesn't need to be symmetric, positive-definite, or even square.
+    Use conjugate_gradient_ideal for matrices that satisfy the above conditions.
+    """
+    return conjugate_gradient_ideal(A = np.dot(A.T, A), \
+                                    b = np.dot(A.T, b), x = x, \
+                                    numIter = numIter, full_output=full_output)
+
+# TODO: add epsilon diagonal stuff
+def iter_refinement(A, b, tol=0.001, numIter=500, x=None, full_output=False):
+    """
+    Iterative refinement method.
+
+    https://en.wikipedia.org/wiki/Iterative_refinement
+
+    Works, but needs more testing on various sizes, condition numbers + initial
+    error in Ax=b.
+    """
+    # tol *= la.norm(A)
+
+    m = len(A)
+    n = len(A.T)
+    if x is None:
+        x = np.zeros(n)
+
+    if full_output:
+        resids = OrderedDict()
+        start_time = time.time()
+
+    for i in range(numIter):
+        #print('Iter %d' % i)
+        if full_output:
+            resids[time.time() - start_time] = norm_dif(x, A, b)
+
+        # Compute the residual r
+        r = b - np.dot(A, x)
+
+        # Solve the system (Ad = r) for d
+        result = scopt.minimize(fun=norm_dif, x0=np.random.randn(m), \
+                                args=(A, r), method='CG')
+        d, success, msg = result.x, result.success, result.message
+        # TODO: find out which method is best/quickest to solve this
+
+        x += d
+
+
+        if la.norm(b - np.dot(A, x)) < tol:
+            print('IR: Close enough at iter %d' % i)
+            if full_output:
+                resids[time.time() - start_time] = norm_dif(x, A, b)
+                return x, i, True, resids
+            else:
+                return x
+
+    print('IR: Max iteration reached (%d)' % numIter)
+    if full_output:
+        resids[time.time() - start_time] = norm_dif(x, A, b)
+        return x, numIter, False, resids
+    else:
+        return x
+
+def continuation():
+    pass
+
+# ==============================================================================
 
 def conjugate_gs_alt(U, A):
     """
@@ -231,85 +347,33 @@ def conjugate_gs_alt(U, A):
 
     return D
 
-def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
+def conjugate_gs(u, A):
     """
-    For SYMMETRIC, POSITIVE-DEFINITE matrices.
-    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf (p. 32)
+    Conjugate Gram-Schmidt process.
+    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf
 
-    Tested on a handful of small (~50x50 - 500x500 matrices) w/ various
-    condition numbers. Behaviour is as expected - systems with higher
-    condition numbers take longer to solve accurately.
-
-    TODO: fix residual error accumulation
+    Args:
+        (numpy.ndarray) u: array of n linearly independent column vectors.
+        (numpy.ndarray) A: matrix for vectors to be mutually conjugate to.
 
     Returns:
-        If not full_output: just the optimal x.
-        If full_output: optimal x, num iterations taken, success, residuals plot.
+        (numpy.ndarray) d: array of n mutually A-conjugate column vectors.
     """
-    #tol *= la.norm(A)
+    n = len(u)
+    d = np.copy(u)
 
-    m, n = len(A), len(A.T)
+    for i in range(1, n):
+        for j in range(0,i):
 
-    if x is None:
-        x = np.zeros(n)
-
-    # d: first search direction (same as initial residual)
-    d = b - np.dot(A, x) # d(0) = r(0) = b - Ax(0)
-    r = d                # from eq. (45)
-
-    if full_output:
-        resids = []
-
-    for i in range(numIter):
-        if full_output:
-            resids.append(norm_dif(x, A, b))
-
-        # TODO: recalculate residual here every _ iters to avoid accumulating error
-        # if 0:
-        #     print(('r(%d): ' + str(r)) % i)
-        #     recalc_r = b - np.dot(A, x)
-        #     print('recalc: ' + str(recalc_r))
-        #     print('resid dif: %f' % la.norm(r - recalc_r))
+            Adj = np.dot(A, d[:, j])
 
 
-        a = np.dot(r.T, r) / np.dot(d.T, np.dot(A, d)) # eq. (46)
+            Bij = -np.inner(u[:, i].T, Adj)
+            Bij /= np.inner(d[:, j].T, Adj) # (37)
 
-        x += a * d
+            d[:, i] += np.dot(Bij, d[:, j]) # (36)
 
-        new_r = r - (a * np.dot(A, d)) # calculate new residual (A-orthogonal to
-                                       # previous except d)      (eq. 47)
-
-        beta = np.dot(new_r.T, new_r) / np.dot(r.T, r) # eq. (48)
-
-        d = new_r + beta * d
-        r = new_r
-
-        if la.norm(b - np.dot(A, x)) < tol:
-            print('CG: Close enough at iter %d' % i)
-            if full_output:
-                resids.append(norm_dif(x, A, b))
-                return x, i, True, resids
-            else:
-                return x
-
-    print('CG: Max iteration reached (%d)' % numIter)
-    if full_output:
-        resids.append(norm_dif(x, A, b))
-        return x, numIter, False, resids
-    else:
-        return x
-
-def conjugate_gradient(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
-    """
-    Conjugate gradients on the normal equations.
-    (Page 41 in "Painless Conjugate Gradient")
-
-    A doesn't need to be symmetric, positive-definite, or even square.
-    Use conjugate_gradient_ideal for matrices that satisfy the above conditions.
-    """
-    return conjugate_gradient_ideal(A = np.dot(A.T, A), \
-                                    b = np.dot(A.T, b), x = x, \
-                                    numIter = numIter, full_output=full_output)
+    return d
 
 def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
     '''
@@ -357,58 +421,3 @@ def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
             break
 
     return x
-
-# TODO: add epsilon diagonal stuff
-def iter_refinement(A, b, tol=0.001, numIter=500, x=None, full_output=False):
-    """
-    Iterative refinement method.
-
-    https://en.wikipedia.org/wiki/Iterative_refinement
-
-    Works, but needs more testing on various sizes, condition numbers + initial
-    error in Ax=b.
-    """
-    # tol *= la.norm(A)
-
-    m = len(A)
-    n = len(A.T)
-    if x is None:
-        x = np.zeros(n)
-
-    if full_output:
-        resids = []
-
-    for i in range(numIter):
-        #print('Iter %d' % i)
-        if full_output:
-            resids.append(norm_dif(x, A, b))
-
-        # Compute the residual r
-        r = b - np.dot(A, x)
-
-        # Solve the system (Ad = r) for d
-        result = scopt.minimize(fun=norm_dif, x0=np.random.randn(m), \
-                                args=(A, r), method='CG')
-        d, success, msg = result.x, result.success, result.message
-        # TODO: find out which method is best/quickest to solve this
-
-        x += d
-
-
-        if la.norm(b - np.dot(A, x)) < tol:
-            print('IR: Close enough at iter %d' % i)
-            if full_output:
-                resids.append(norm_dif(x, A, b))
-                return x, i, True, resids
-            else:
-                return x
-
-    print('IR: Max iteration reached (%d)' % numIter)
-    if full_output:
-        resids.append(norm_dif(x, A, b))
-        return x, numIter, False, resids
-    else:
-        return x
-
-def continuation():
-    pass
