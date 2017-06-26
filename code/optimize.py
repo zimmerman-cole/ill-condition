@@ -66,6 +66,85 @@ def gradient_descent(A, b, tol=0.001, x = None, numIter = 500, full_output=False
     else:
         return x
 
+# modification: 1 matrix-vector multiplication per iteration
+def gradient_descent_alt(A, b, x0=None, x_tru=None, numIter=500, recalc=499):
+    """
+    Implementation of gradient descent for PSD matrices.
+    
+    Notes:
+        Needs thorough testing.
+        Re-calculate residual EVERY iteration (so slow but a bit more accurate).
+        Only 1 matrix-vector computation is performed per iteration (vs 2).
+        Slow history tracking.
+
+    Args:
+        (numpy.ndarray)     A:    n x n transformation matrix.
+        (numpy.ndarray)     b:    n x 1 "target values".
+        (numpy.ndarray)    x0:    n x 1 initial guess (optional).
+        (numpy.ndarray) x_tru:    n x 1 true x (optional).
+        (int)         numIter:    Number of passes over data.
+
+    Returns:
+        argmin(x) ||Ax - b||_2.
+    """
+    
+    n = len(A)
+    
+    # Ensure sound inputs
+    assert len(A.T) == n
+    assert len(b) == n
+    
+    # Working with (n, ) vectors, not (n, 1)
+    if len(b.shape) == 2: b = b.reshape(n, )
+    if x0 is None:
+        x0 = np.random.randn(n, )
+    else:
+        assert len(x0) == n
+        if len(x0.shape) == 2: x0 = x0.reshape(n, ) # (n, ) over (n, 1)
+
+    # diagnostics
+    x_hist = []
+    if x_tru != None:
+        err_hist = []
+
+    # first descent step
+    x = x0
+    r_curr = b - np.dot(A, x)
+    Ar_curr = np.dot(A,r_curr)
+    a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
+    r_new = r_curr - a*Ar_curr
+    x += a * r_curr
+    x_hist += x
+    err = la.norm(x-xtru)
+    err_hist += err
+
+    # remaining descent steps
+    for _ in range(1,numIter):
+        if _%recalc == 0:
+            r = b - np.dot(A, x)
+            if la.norm(r) < 10**-11: break
+            a = np.inner(r.T, r) / float(np.inner(r.T, np.inner(A, r)))
+            x += a * r
+        else:
+            #print('Iter %d' % _)
+
+            # calculate residual (direction of steepest descent)
+            r_curr = r_new
+            if la.norm(r_curr) < 10**-11: break
+
+            # calculate step size (via analytic line search)
+            Ar_curr = np.inner(A, r_curr)
+            a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
+            r_new = r_curr - a*Ar_curr
+
+            # updates
+            x += a * r_curr
+            x_hist += x
+            err = la.norm(x-xtru)
+            err_hist += err
+
+    return x
+
 def conjugate_gs(u, A):
     """
     Conjugate Gram-Schmidt process.
