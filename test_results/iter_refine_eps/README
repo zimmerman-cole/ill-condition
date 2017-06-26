@@ -1,0 +1,18 @@
+Each matrix stored in this folder is Ab, that is b (stored as a column vector) appended onto A.
+To extract:
+
+Ab = np.load('m5.npy', 'r')
+A = Ab[:, :-1]
+b = Ab[:, -1]
+
+All A in this folder have:
+
+	Condition number 	1000
+	Dimensions		100 x 100
+
+while b of course has dimensions 100 x 1.
+
+Some of these (A,b) blew up my iterative refinement/continuation algorithm (in dir 'blows_up'), 
+but others caused it to converge just fine (in dir 'converges').
+
+See test_solvers.gather_IR_data for the code that generates these matrices.
