@@ -237,23 +237,48 @@ def test_iter_refine(m, n, cond_num = 25, num_samples=20):
         print('Final error: %f' % la.norm(true_x - x))
         print('Time taken: %f seconds' % (time.time() - st_time))
 
-def test_all_symmetric_pos_def(n, cond_num = 100):
+def test_all_symmetric_pos_def(n, cond_num = 100, n_iter=100):
     """
     Test algorithms' performances on a SYMMETRIC, POSITIVE-DEFINITE matrix
         of given size and condition number.
     """
 
-    n_iter = 100
-
     A = util.psd_with_cond(cond_num, n=n)
-    true_x = 4 * np.random.randn(n)
+    true_x = 4 * np.random.randn(n) # 'magic' number
     b = np.dot(A, true_x)
 
-    #x = np.zeros(n) # Conjugate gradients
+    # Conjugate gradients
     cg_results = optimize.conjugate_gradient_ideal(A, b, numIter=n_iter, full_output=True)
-    #x = np.zeros(n) # Gradient descent
+    # Gradient descent
     gd_results = optimize.gradient_descent(A, b, numIter=n_iter, full_output=True)
-    #x = np.zeros(n)
+    # Iterative refinement
+    ir_results = optimize.iter_refinement(A, b, numIter=n_iter, full_output=True)
+
+    plt.plot(cg_results[3], marker='o')
+    plt.plot(gd_results[3], marker='o')
+    plt.plot(ir_results[3], marker='o')
+
+
+    plt.xlabel('Iteration')
+    plt.ylabel('Residual ||Ax - b||')
+    plt.yscale('log')
+    plt.legend(['CG', 'GD', 'IR'])
+    if type(cond_num) == float:
+        plt.title('dim(A): %dx%d. cond(A): %.2f' % (n, n, round(cond_num, 2)))
+    else:
+        plt.title('dim(A): %dx%d. cond(A): %d' % (n, n, cond_num))
+    plt.show()
+
+def test_all(m, n, cond_num = 100, n_iter = 100):
+    A = util.mat_from_cond(cond_num=cond_num, m=m, n=n)
+    true_x = 4 * np.random.randn(n) # 'magic' number
+    b = np.dot(A, true_x)
+
+    # Conjugate gradients
+    cg_results = optimize.conjugate_gradient(A, b, numIter=n_iter, full_output=True)
+    # Gradient descent
+    gd_results = optimize.gradient_descent(A, b, numIter=n_iter, full_output=True)
+    # Iterative refinement
     ir_results = optimize.iter_refinement(A, b, numIter=n_iter, full_output=True)
 
     plt.plot(cg_results[3], marker='o')

@@ -208,11 +208,7 @@ def conjugate_gs_alt(U, A):
 
     return D
 
-# REFERENCE IMPLEMENTATION
-def conjugate_gradient_ideal(A, b, \
-                            tol=0.001, x = None, \
-                            numIter = 500, full_output=False \
-                            ):
+def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
     """
     For SYMMETRIC, POSITIVE-DEFINITE matrices.
     https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf (p. 32)
@@ -275,6 +271,17 @@ def conjugate_gradient_ideal(A, b, \
     else:
         return x
 
+def conjugate_gradient(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
+    """
+    Conjugate gradients on the normal equations.
+    (Page 41 in "Painless Conjugate Gradient")
+
+    A doesn't need to be symmetric, positive-definite, or even square.
+    Use conjugate_gradient_ideal for matrices that satisfy the above conditions.
+    """
+    return conjugate_gradient_ideal(A = np.dot(A.T, A), \
+                                    b = np.dot(A.T, b), x = x, \
+                                    numIter = numIter, full_output=full_output)
 
 def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
     '''
