@@ -14,7 +14,7 @@ def norm_dif(x, *args):
     return la.norm(b - np.dot(A, x))
 
 # baseline
-def gradient_descent(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
+def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=False):
     """
     Standard gradient descent for SYMMETRIC,
     POSITIVE-DEFINITE matrices.
@@ -67,7 +67,7 @@ def gradient_descent(A, b, tol=0.001, x = None, numIter = 500, full_output=False
         return x
 
 # modification: 1 matrix-vector multiplication per iteration
-def gradient_descent_alt(A, b, x0=None, x_tru=None, numIter=500, recalc=499):
+def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
     """
     Implementation of gradient descent for PSD matrices.
     
@@ -104,8 +104,9 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, numIter=500, recalc=499):
 
     # diagnostics
     x_hist = []
-    if x_tru != None:
-        err_hist = []
+    
+    if full_output:
+        resids = []
 
     # first descent step
     x = x0
@@ -114,36 +115,59 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, numIter=500, recalc=499):
     a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
     r_new = r_curr - a*Ar_curr
     x += a * r_curr
-    x_hist += x
-    err = la.norm(x-xtru)
-    err_hist += err
+    
+    if full_output:
+        x_hist.append(x)
+        if x_tru is not None:
+            err = la.norm(x-x_tru)
+        else:
+            err = la.norm(np.dot(A,x)-b)
+        resids.append(err)
 
     # remaining descent steps
     for _ in range(1,numIter):
-        if _%recalc == 0:
-            r = b - np.dot(A, x)
-            if la.norm(r) < 10**-11: break
-            a = np.inner(r.T, r) / float(np.inner(r.T, np.inner(A, r)))
-            x += a * r
+
+        # calculate residual (direction of steepest descent)
+        r_curr = r_new
+
+        # calculate step size (via analytic line search)
+        Ar_curr = np.inner(A, r_curr)
+        a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
+        
+        # updates
+        x += a * r_curr
+        x_hist.append(x)
+        
+        # calculate residuals for next step
+        if _ % recalc == 0:
+            r_new = b - np.dot(A, x)
         else:
-            #print('Iter %d' % _)
-
-            # calculate residual (direction of steepest descent)
-            r_curr = r_new
-            if la.norm(r_curr) < 10**-11: break
-
-            # calculate step size (via analytic line search)
-            Ar_curr = np.inner(A, r_curr)
-            a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
             r_new = r_curr - a*Ar_curr
 
-            # updates
-            x += a * r_curr
-            x_hist += x
-            err = la.norm(x-xtru)
-            err_hist += err
+        # add residuals
+        if x_tru is not None:
+            err = la.norm(x-x_tru)
+        else:
+            err = la.norm(np.dot(A,x)-b)
+        if full_output:
+            resids.append(err)
 
-    return x
+        # stop if close
+        if err < tol:
+            print('GD_alt: Close enough at iter %d' % _)
+            print(la.norm(r_new))
+            if full_output:
+                return x, _, True, resids
+            else:
+                return x
+
+    print('GD_alt: Max iteration reached (%d)' % numIter)
+    if full_output:
+        return x, numIter, False, resids
+    else:
+        return x
+
+# modifications: 1 matrix-vector multiplication per iteration; nonsymmetric (square) matrix A
 
 def conjugate_gs(u, A):
     """
