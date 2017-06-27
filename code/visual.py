@@ -73,10 +73,10 @@ def visual_gd():
     print('num iter: %d' % len(path))
     plt.show()
 
+
 def visual_gd_bad_start():
     """
-    Visualized gradient descent
-    Finds bad start by finding major axis and adding small random noise to that eigenvector
+    Visualized gradient descent.
     """
     A = util.psd_from_cond(cond_num=50,n=2)
     x_true = np.random.randn(2)
@@ -92,13 +92,14 @@ def visual_gd_bad_start():
 
     print("major axis: %s" % major_axis)
     print("minor axis: %s" % minor_axis)
-    y = x_true+major_axis/la.norm(major_axis)*5+np.random.randn(2)*0.05
-    print("truth: %s" % x_true)
-    print("start: %s" % y)
+    y_minor = x_true+minor_axis/la.norm(minor_axis)*5+np.random.randn(2)*0.05
+    y_major = x_true+major_axis/la.norm(major_axis)*5+np.random.randn(2)*0.05
+    print(y_minor)
 
-    x_opt = optimize.gradient_descent(A,b, x=np.array([y[0],y[1]]))
-    path = gd_path(A, b, x=np.array([y[0],y[1]]))
-
+    x_opt_minor = optimize.gradient_descent(A,b, x=np.copy(y_minor))
+    path_minor = gd_path(A, b, x=np.copy(y_minor))
+    x_opt_major = optimize.gradient_descent(A,b, x=np.copy(y_major))
+    path_major = gd_path(A, b, x=np.copy(y_major))
     
     # span = np.sqrt((path[0][0] - x_opt[0])**2 + (path[0][1] - x_opt[1])**2)
     span = 7
@@ -127,16 +128,29 @@ def visual_gd_bad_start():
     cs = ax.contour(x1v, x2v, hv,levels=ll)
     plt.clabel(cs)
     plt.axis('equal')
-    plt.plot([p[0] for p in path], [p[1] for p in path], marker='o')
+    
+    
     plt.plot(x_true[0], x_true[1], marker='D', markersize=10) # TRUE POINT
-    plt.plot(path[0][0], path[0][1], marker='x', markersize=10) # STARTING POINT
-    print('num iter: %d' % len(path))
+    
+    plt.plot([p[0] for p in path_minor], [p[1] for p in path_minor], marker='o', color="blue")
+    plt.plot(path_minor[0][0], path_minor[0][1], marker='x', markersize=10, color="blue") # STARTING POINT
+    print('num iter: %d' % len(path_minor))
+
+    plt.plot([p[0] for p in path_major], [p[1] for p in path_major], marker='o', color="red")
+    plt.plot(path_major[0][0], path_major[0][1], marker='x', markersize=10, color="red") # STARTING POINT
+    print('num iter: %d' % len(path_major))
 
     # plot e-vectors:
-    vs = np.array([[ y[0],y[1],major_axis[0],major_axis[1] ] , [ y[0],y[1],minor_axis[0],minor_axis[1] ]])
+    vs_minor = np.array([[ y_minor[0],y_minor[1],major_axis[0],major_axis[1] ] , [ y_minor[0],y_minor[1],minor_axis[0],minor_axis[1] ]])
+    vs_major = np.array([[ y_major[0],y_major[1],major_axis[0],major_axis[1] ] , [ y_major[0],y_major[1],minor_axis[0],minor_axis[1] ]])
+    
     # vs = np.array([[ y[0],y[1],major_axis[1],major_axis[0] ] , [ y[0],y[1],minor_axis[1],minor_axis[0] ]])
     # vs = np.array([[ y[0],y[1],evecs[0][1],evecs[0][0] ] , [ y[0],y[1],evecs[1][1],evecs[1][0] ]])
-    X, Y, U, V = zip(*vs)
-    ax.quiver(X, Y, U, V, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
+    
+    X_minor, Y_minor, U_minor, V_minor = zip(*vs_minor)
+    X_major, Y_major, U_major, V_major = zip(*vs_major)
+    ax.quiver(X_minor, Y_minor, U_minor, V_minor, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
+    ax.quiver(X_major, Y_major, U_major, V_major, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
     plt.draw()
     plt.show()
+
