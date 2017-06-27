@@ -358,7 +358,6 @@ def conjugate_gradient(A, b, tol=0.001, x = None, numIter = 500, full_output=Fal
                                     b = np.dot(A.T, b), x = x, \
                                     numIter = numIter, full_output=full_output)
 
-
 # This works, but much slower than CG for large/high condition number matrices
 def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_output=False):
     """
@@ -380,7 +379,7 @@ def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_outpu
         resids = OrderedDict()
         start_time = time.time()
 
-    for i in range(1,numIter+1):
+    for i in range(numIter):
         e = 0.5 * e
         if np.random.uniform() < 0.01:
             print('IR iter %d; e: %f' % (i, e))

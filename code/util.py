@@ -57,7 +57,7 @@ def small_sing_vals(cond_num, m=50, n=50, max_sing=0.8):
 
 def psd_from_cond(cond_num, n=50, min_sing=None):
     """
-    Generates a square matrix with specified condition number. Use this
+    Generates a square SYMMETRIC matrix with specified condition number. Use this
     to get a matrix with large (by most standards), decaying singular values.
 
     Args:
