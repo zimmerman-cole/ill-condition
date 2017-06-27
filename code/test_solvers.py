@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
-import time, sys, util, optimize
+import time, sys, util, optimize, os
 from scipy import optimize as scopt
 from scipy.sparse import linalg as scla
 from collections import OrderedDict
@@ -185,6 +185,7 @@ def test_minres(cond_num, n, shift, num_samples=20, verbose=0):
 
     return avg_time, avg_pct_improv
 
+# Test CG ideal
 def test_cg(n, cond_num=50, tol=0.000001, num_samples=20, verbose=0):
     """
     Test optimize.conjugate_gradient_ideal(...).
@@ -217,6 +218,7 @@ def test_cg(n, cond_num=50, tol=0.000001, num_samples=20, verbose=0):
 
     print('Average n_iter needed for condition number ~%d: %f' % (cond_num, avg_iter))
 
+# Test outdated iter. refinement
 def test_iter_refine(m, n, cond_num = 25, num_samples=20):
     """
     Test optimize.iter_refinement(...).
@@ -275,6 +277,25 @@ def test_all_symmetric_pos_def(n, cond_num = 100, n_iter=100):
         plt.title('dim(A): %dx%d. cond(A): %d' % (n, n, cond_num))
     plt.show()
 
+# doesn't work
+def test_iter_eps(n, e=100, cond_num = 100, n_iter=500):
+    A = util.mat_from_cond(cond_num, m=n, n=n)
+    true_x = 4 * np.random.randn(n)
+    b = np.dot(A, true_x)
+
+    print('Initial error: %f' % norm_dif(np.zeros(n), A, b))
+    xopt, n_iter, suc, resids = optimize.iter_refinement_const_eps(A, b, e=e, full_output=True)
+    print('Final error: %f (%d iter)' % (norm_dif(xopt, A, b), n_iter))
+
+    plt.scatter(resids.keys(), resids.values(), marker='o')
+    plt.ylabel('Residuals')
+    plt.xlabel('Time')
+    plt.yscale('log')
+    #plt.show()
+
+    return norm_dif(xopt, A, b)
+
+
 # ==============================================================================
 # RESIDUAL PLOTTING METHODS BELOW
 # ==============================================================================
@@ -329,13 +350,13 @@ def test_all_time(m, n, cond_num = 100, n_iter = 100):
     st_time = time.time()
     cg_results = optimize.conjugate_gradient(A, b, numIter=n_iter, full_output=True)
     print('CG final error: %f' % cg_results[3][next(reversed(cg_results[3]))] )
-    print('CG took %f seconds' % (time.time() - st_time))
+    print('CG took %f seconds (%d iter)' % (time.time() - st_time, cg_results[1]))
 
     # Iterative refinement w/ epsilon smoothing
     st_time = time.time()
     ir_results = optimize.iter_refinement_eps(A, b, numIter=n_iter, full_output=True)
-    print(norm_dif(ir_results[0], A, b))
-    print('IR_eps took %f seconds' % (time.time() - st_time))
+    print('IR_eps final error: %f' % norm_dif(ir_results[0], A, b))
+    print('IR_eps took %f seconds (%d iter)' % (time.time() - st_time, ir_results[1]))
 
     plt.scatter(cg_results[3].keys(), cg_results[3].values(), marker='x')
     plt.scatter(ir_results[3].keys(), ir_results[3].values(), marker='o')
@@ -370,6 +391,10 @@ def test_all_time(m, n, cond_num = 100, n_iter = 100):
     #         traceback.print_exc()
     plt.show()
 
+# ==============================================================================
+# LOAD/GATHER DATA
+# ==============================================================================
+
 # Gather data on weird iter_refine_eps
 def gather_IR_data(m, n, cond_num = 100, n_iter = 100, n_mats=100):
     """
@@ -398,3 +423,38 @@ def gather_IR_data(m, n, cond_num = 100, n_iter = 100, n_mats=100):
             # ones that did
             path_ = '../test_results/iter_refine_eps/blows_up/m%d' % i
             np.save(path_, to_save)
+
+def load_IR_data():
+
+    b_path = '../test_results/iter_refine_eps/blows_up/'
+    c_path = '../test_results/iter_refine_eps/converges/'
+
+    b_filenames = [f for f in os.listdir(b_path) if f[-4:] == '.npy']
+    c_filenames = [f for f in os.listdir(c_path) if f[-4:] == '.npy']
+
+    b_arrs = []
+    c_arrs = []
+
+    for b in b_filenames:
+        ar = np.load(b_path+b, 'r')
+        b_arrs.append(ar)
+    for c in c_filenames:
+        ar = np.load(c_path+c, 'r')
+        c_arrs.append(ar)
+
+    return b_arrs, c_arrs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+pass
