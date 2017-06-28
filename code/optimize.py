@@ -487,6 +487,49 @@ def conjugate_gs(u, A):
 
     return d
 
+def arnoldi(A,b):
+    """
+    Conjugate (modifed) Gram-Schmidt process for Krylov(A,b).
+
+    Args:
+        A:  matrix (psd)
+        b:  vector RHS solution
+
+    Returns:
+        Q:  matrix (unitary/orthogonal) normalized vectors where
+            Q[:,1], ... , Q[:,n] span K^n(A,b)
+        H:  matrix (upper hessenberg) s.t.
+            H = Q^T A Q upon completion
+    """
+    
+    ## initialize
+    n = len(A)
+    Q = np.zeros([n,n])
+    H = np.zeros([n,n])
+
+    ## first vector
+    Q[:,0] = b/la.norm(b)
+
+    ## remaining vectors
+    for j in range(n-1):               # start computation for Q[:,j+1]
+        t = np.dot(A,Q[:,j])           # t \in K^[j+1](A,b)
+        for i in range(j+1):
+            H[i,j] = np.dot(Q[:,i],t)  # H[i,j] * Q[:,i] is proj of t onto Q[:,i]
+            t -= H[i,j] * Q[:,i]       # remove proj (ORTHO)
+        H[j+1,j] = la.norm(t)
+        Q[:,j+1] = t/H[j+1,j]          # normalize (NORMALIZE)
+
+    ## last column of H
+    H[:,n-1] = np.dot(Q.T,np.dot(A,Q[:,n-1]))
+    return Q,H
+
+def test_arnoldi(A,b):
+    Q,H = arnoldi(A,b)
+    for i in range(len(Q)):
+        for j in range(i):
+            print(np.dot(Q[:,i],Q[:,j]))
+    print(H - np.dot(Q.T,np.dot(A,Q)))
+
 def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
     '''
     Solves Ax = b with Jacobi splitting method
