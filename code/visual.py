@@ -86,8 +86,6 @@ def visual_gd_bad_start():
     x_true = np.random.randn(2)
     b = np.dot(A,x_true)
     evals,evecs = la.eig(A)
-    print("evals: %s" % evals)
-    print("evecs: %s" % evecs)
     
     major_axis = evecs[np.argmax(abs(evals))]
     major_axis[0],major_axis[1] = major_axis[1],major_axis[0]
@@ -95,8 +93,6 @@ def visual_gd_bad_start():
     minor_axis[0],minor_axis[1] = minor_axis[1],minor_axis[0]
     worst_axis = max(evals)*major_axis + min(evals)*minor_axis
 
-    print("major axis: %s" % major_axis)
-    print("minor axis: %s" % minor_axis)
     y_minor = x_true+minor_axis/la.norm(minor_axis)*5+np.random.randn(2)
     y_major = x_true+major_axis/la.norm(major_axis)*5+np.random.randn(2)*0.05
     y_worst = x_true+worst_axis/la.norm(worst_axis)*5
@@ -138,14 +134,14 @@ def visual_gd_bad_start():
     plt.plot(x_true[0], x_true[1], marker='D', markersize=10) # TRUE POINT
     
     # plot paths
-    plt.plot([p[0] for p in path_minor], [p[1] for p in path_minor], marker='o', color="blue")
-    plt.plot(path_minor[0][0], path_minor[0][1], marker='x', markersize=10, color="blue") # STARTING POINT
+    plt.plot([p[0] for p in path_minor], [p[1] for p in path_minor], marker='o', markersize=0.5, color="blue")
+    plt.plot(path_minor[0][0], path_minor[0][1], marker='x', markersize=15, color="blue") # STARTING POINT
 
-    plt.plot([p[0] for p in path_major], [p[1] for p in path_major], marker='o', color="red")
-    plt.plot(path_major[0][0], path_major[0][1], marker='x', markersize=10, color="red") # STARTING POINT
+    plt.plot([p[0] for p in path_major], [p[1] for p in path_major], marker='o', markersize=0.5, color="red")
+    plt.plot(path_major[0][0], path_major[0][1], marker='x', markersize=15, color="red") # STARTING POINT
 
-    plt.plot([p[0] for p in path_worst], [p[1] for p in path_worst], marker='o', color="green")
-    plt.plot(path_worst[0][0], path_worst[0][1], marker='x', markersize=10, color="green") # STARTING POINT
+    plt.plot([p[0] for p in path_worst], [p[1] for p in path_worst], marker='o', markersize=0.5, color="green")
+    plt.plot(path_worst[0][0], path_worst[0][1], marker='x', markersize=15, color="green") # STARTING POINT
 
     # plot e-vectors:
     vs_minor = np.array([[ y_minor[0],y_minor[1],major_axis[0],major_axis[1] ] , [ y_minor[0],y_minor[1],minor_axis[0],minor_axis[1] ]])
@@ -161,3 +157,4 @@ def visual_gd_bad_start():
     ax.quiver(X_worst, Y_worst, U_worst, V_worst, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
     plt.draw()
     plt.show()
+
