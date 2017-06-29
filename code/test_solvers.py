@@ -335,7 +335,7 @@ def test_all(m, n, cond_num = 100, n_iter = 100):
         plt.title('dim(A): %dx%d. cond(A): %d' % (n, n, cond_num))
     plt.show()
 
-# Plot residuals vs time at each iteration
+# Plot residuals vs TIME at each iteration
 def test_all_time(m, n, cond_num = 100, n_iter = 100):
     """
     TODO: study IR w/ epsilon smoothing stuff

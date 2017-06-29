@@ -17,11 +17,155 @@ def norm_dif(x, *args):
     A, b = args
     return la.norm(b - np.dot(A, x))
 
+class GradientDescent:
+    """
+    Gradient descent solver.
+    """
+
+    def __init__(self, A=None, b=None, full_output=False):
+        self.A = A
+        self.b = b
+        self.full_output = full_output
+
+    def __str__(self):
+        pass
+
+    def __repr__(self):
+        pass
+
+    def fit(self, A, b):
+        self.A = A
+        self.b = b
+
+    def gradient_descent(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
+        """
+        For SYMMETRIC, POSITIVE-DEFINITE matrices.
+
+        If self.full_output and x_true != None, this returns:
+            xopt, n_iter, resids, path, x_difs
+        If self.full_output and x_true is None:
+            xopt, n_iter, resids, path
+        Else:
+            xopt
+
+        TODO: make separate method for returning path?
+        TODO: is slightly less accurate than gd_alt and gd_nonsymm
+                (but much faster than them)
+        """
+        if self.A is None or self.b is None:
+            raise AttributeError('A and/or b haven\'t been set yet.')
+
+        assert len(self.A) == len(self.A.T) == len(self.b)
+        if x0 is None:
+            x = np.zeros(len(self.A))
+        else:
+            x = np.copy(x0)
+
+        if self.full_output:
+            return self.__gd_full(tol=tol, x=x, max_iter=max_iter, recalc=recalc, x_true=x_true)
+        else:
+            return self.__gd_bare(tol=tol, x=x, max_iter=max_iter, recalc=recalc)
+
+    def __gd_full(self, tol, x, max_iter, recalc, x_true):
+        """
+        Tracks everything (times/iteration, residuals, path taken, etc.).
+
+        If you provide an x_true, it also tracks ||x - x_true|| at each
+            iteration.
+        """
+        start_time = time.time()
+        path = [x]      # track path taken
+        if x_true is not None:
+            x_difs = [la.norm(x - x_true)]
+
+        # First descent step ======================================
+        r = self.b - np.dot(self.A, x)
+        r_norm = la.norm(r)
+        residuals = [(r_norm, time.time() - start_time)]
+
+        # Check if close enough already
+        if r_norm <= tol:
+            if x_true is None:
+                return x, i, residuals, path
+            else:
+                return x, i, residuals, path, x_difs
+
+        # If not, take a step
+        i = 1
+        Ar = np.dot(self.A, r)
+        a = np.inner(r.T, r) / np.dot(r.T, Ar)
+        x += a * r
+        path.append(x)
+        if x_true is not None:
+            x_difs.append(la.norm(x - x_true))
+        # =========================================================
+
+        # Rest of descent
+        while i < max_iter:
+            # Directly calculate residual every 'recalc' steps
+            if (i % recalc) == 0:
+                r = self.b - np.dot(self.A, x)
+            else:
+                # Else, update using one less matrix-vector product
+                r -= a * Ar
+            r_norm = la.norm(r)
+            residuals.append((r_norm, time.time() - start_time))
+
+            # Check if close enough
+            if r_norm <= tol: break
+            i += 1
+
+            # If not, take another step
+            Ar = np.dot(self.A, r)
+            x += a * r
+            path.append(x)
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
+
+        if x_true is None:
+            return x, i, residuals, path
+        else:
+            return x, i, residuals, path, x_difs
+
+
+
+    def __gd_bare(self, tol, x, max_iter, recalc):
+        """
+        For max performance.
+        """
+        # First descent step ==========================================
+        r = self.b - np.dot(self.A, x)
+        # Check if close enough already
+        if la.norm(r) <= tol:
+            return x
+
+        # If not, take a step
+        Ar = np.dot(self.A, r)
+        a = np.inner(r.T, r) / np.dot(r.T, Ar)
+        x += a * r
+        # ==============================================================
+
+        for i in range(1, max_iter):
+            # Directly calculate residual every 'recalc' steps
+            if (i % recalc) == 0:
+                r = self.b - np.dot(self.A, x)
+            else:
+                # Else, update using one less matrix-vector product
+                r -= a * Ar
+
+            # Check if close enough
+            if r_norm <= tol: break
+
+            # If not, take another step
+            Ar = np.dot(self.A, r)
+            x += a * r
+
+        return x
+
 # baseline; for symmetric, positive-definite A
 def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=False):
     """
     Standard gradient descent for SYMMETRIC, POSITIVE-DEFINITE matrices.
-    ## TODO: fix weird zigzag behaviour.
 
     Re-calculates residual EVERY iteration (so slow but a bit more accurate).
 
@@ -397,7 +541,7 @@ def conjugate_gradient_psd(A,b,x_0=None,x_tru=None,tol=10**-3,max_iter=500,recal
         else:
             status = False
         if x_tru is not None:
-            errs[i] = la.norm(x-x_tru)        
+            errs[i] = la.norm(x-x_tru)
             return x, i, status, resids, errs
         else:
             return x, i, status, resids
@@ -562,7 +706,7 @@ def arnoldi(A,b):
         H:  matrix (upper hessenberg) s.t.
             H = Q^T A Q upon completion
     """
-    
+
     ## initialize
     n = len(A)
     Q = np.zeros([n,n])
