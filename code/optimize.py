@@ -345,6 +345,65 @@ def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_outp
     else:
         return x
 
+def conjugate_gradient_psd(A,b,x_0=None,x_tru=None,tol=10**-3,max_iter=500,recalc=50,full_output=False):
+    """
+    CG for symmetric, psd A with 1 matrix-vector multiplication per iteration
+    """
+    n = len(A)
+    if x_0 is None:
+        x_0 = np.random.randn(n)
+
+    x = np.copy(x_0)
+    i = 0
+    r = b-np.dot(A,x)
+    d = np.copy(r)
+    del_new = np.dot(r,r)
+    del_0 = np.copy(del_new)
+
+    if full_output == True:
+        resids = OrderedDict()
+        start_time = time.time()
+        resids[i] = la.norm(b-np.dot(A,x))
+        if x_tru is not None:
+            errs = OrderedDict()
+            errs[i] = la.norm(x-x_tru)
+
+    while not (i > max_iter or del_new < (tol**2)*del_0):
+
+        q = np.dot(A,d)
+        alpha = del_new / np.dot(d,q)
+        x += alpha*d
+        if i % recalc == 0:
+            r = b-np.dot(A,x)
+        else:
+            r -= alpha*q
+
+        ## updates
+        del_old = np.copy(del_new)
+        del_new = np.dot(r,r)
+        beta = del_new / del_old
+        d = r + beta*d
+        i += 1
+
+        if full_output == True:
+            resids[i] = la.norm(b-np.dot(A,x))
+            if x_tru is not None:
+                errs[i] = la.norm(x-x_tru)
+
+    if full_output == True:
+        resids[i] = la.norm(b-np.dot(A,x))
+        if i < max_iter:
+            status = True
+        else:
+            status = False
+        if x_tru is not None:
+            errs[i] = la.norm(x-x_tru)        
+            return x, i, status, resids, errs
+        else:
+            return x, i, status, resids
+    else:
+        return x
+
 # for any A
 def conjugate_gradient(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
     """
@@ -357,6 +416,8 @@ def conjugate_gradient(A, b, tol=0.001, x = None, numIter = 500, full_output=Fal
     return conjugate_gradient_ideal(A = np.dot(A.T, A), \
                                     b = np.dot(A.T, b), x = x, \
                                     numIter = numIter, full_output=full_output)
+
+# TO DO: BiCGStab
 
 # This works, but much slower than CG for large/high condition number matrices
 def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_output=False):
