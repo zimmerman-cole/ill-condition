@@ -6,8 +6,34 @@ from collections import OrderedDict
 from sklearn.linear_model import SGDClassifier
 
 
-# TODO: currently most (?) methods calculate residual an extra time each iteration
-#               (when checking if resid norm is within tolerance range)
+# class Solver:
+#     """
+#     Parent class for linear solvers implemented here.
+#     """
+#
+#     def __init__(self, A=None, b=None, \
+#                  tol=10**-5, max_iter=500, \
+#                  x_true=None):
+#         self.A, self.b = A, b
+#         self.tol = tol
+#         self.max_iter = max_iter
+#         self.x_true = x_true
+#
+#     def __check_ready(self):
+#         """
+#         Check everything's in place to start optimization. Does NOT
+#         check A is symmetric, positive-definite, or even square.
+#         """
+#         if self.A is None or self.b is None:
+#             raise AttributeError('A and/or b haven\'t been set yet.')
+#         if len(self.A) != len(self.b):
+#             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
+#
+#     def __resid_norm(self, x):
+#         """
+#         || b - Ax || (Frobenius norm)
+#         """
+#         return la.norm(self.b - np.dot(self.A, x))
 
 # || b - Ax ||
 def norm_dif(x, *args):
@@ -17,9 +43,23 @@ def norm_dif(x, *args):
     A, b = args
     return la.norm(b - np.dot(A, x))
 
-class GradientDescent:
+class GradientDescentSolver:
     """
     Gradient descent solver.
+
+    All arguments for constructor (A, b, full_output) are optional.
+        full_output defaults to False.
+
+    Methods:
+        gd.fit(A, b):
+            Sets A and b.
+
+        gd.gradient_descent(tol, x0, max_iter, recalc, x_true):
+            All arguments are optional, but A and b must have been set before
+            calling this method. A must be symmetric and positive-definite.
+
+        gd.path(tol, x0, max_iter, recalc):
+            Returns list of points traversed during descent (for visualization).
     """
 
     def __init__(self, A=None, b=None, full_output=False):
@@ -47,24 +87,33 @@ class GradientDescent:
         return self.__str__()
 
     def fit(self, A, b):
+        """
+        "Fit"
+        """
         self.A = A
         self.b = b
 
     def gradient_descent(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
         """
-        For SYMMETRIC, POSITIVE-DEFINITE matrices.
+        For SYMMETRIC, POSITIVE-DEFINITE matrices only.
 
-        If self.full_output and x_true != None, this returns:
-            xopt, n_iter, resids, path, x_difs
-        If self.full_output and x_true is None:
-            xopt, n_iter, resids, path
-        Else:
+        If full_output=True and x_true is provided, this returns:
+            xopt:       optimal x (in numpy array)
+            n_iter:     number of iterations performed
+            resids:     for each iteration, its corresponding time and residual
+                            (in a list of tuples)
+            x_difs:     || x - x_true || at each iteration
+
+        If full_output=True and x_true is not provided:
+            xopt, n_iter, resids
+
+        If full_output=False:
             xopt
 
-        TODO: make separate method for returning path?
         TODO: is slightly less accurate than gd_alt and gd_nonsymm
-                (but much faster than them)
+                (but much faster than them, so maybe doesn't matter)
         """
+        # ======================================================================
         if self.A is None or self.b is None:
             raise AttributeError('A and/or b haven\'t been set yet.')
 
@@ -73,6 +122,7 @@ class GradientDescent:
             x = np.zeros(len(self.A))
         else:
             x = np.copy(x0)
+        # ======================================================================
 
         if self.full_output:
             return self.__gd_full(tol=tol, x=x, max_iter=max_iter, recalc=recalc, x_true=x_true)
@@ -81,13 +131,12 @@ class GradientDescent:
 
     def __gd_full(self, tol, x, max_iter, recalc, x_true):
         """
-        Tracks everything (times/iteration, residuals, path taken, etc.).
+        Tracks everything (times/iteration, residuals, etc.).
 
         If you provide an x_true, it also tracks ||x - x_true|| at each
             iteration.
         """
         start_time = time.time()
-        path = [x]      # track path taken
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
 
@@ -99,16 +148,15 @@ class GradientDescent:
         # Check if close enough already
         if r_norm <= tol:
             if x_true is None:
-                return x, i, residuals, path
+                return x, i, residuals
             else:
-                return x, i, residuals, path, x_difs
+                return x, i, residuals, x_difs
 
         # If not, take a step
         i = 1
         Ar = np.dot(self.A, r)
         a = np.inner(r.T, r) / np.dot(r.T, Ar)
         x += a * r
-        path.append(x)
         if x_true is not None:
             x_difs.append(la.norm(x - x_true))
         # =========================================================
@@ -131,14 +179,13 @@ class GradientDescent:
             # If not, take another step
             Ar = np.dot(self.A, r)
             x += a * r
-            path.append(x)
             if x_true is not None:
                 x_difs.append(la.norm(x - x_true))
 
         if x_true is None:
-            return x, i, residuals, path
+            return x, i, residuals
         else:
-            return x, i, residuals, path, x_difs
+            return x, i, residuals, x_difs
 
     def __gd_bare(self, tol, x, max_iter, recalc):
         """
@@ -172,6 +219,147 @@ class GradientDescent:
             x += a * r
 
         return x
+
+    def path(self, tol = 10**-5, x0 = None, max_iter=500, recalc=20):
+        """
+        Returns list of points traversed during descent.
+        """
+        # ======================================================================
+        if self.A is None or self.b is None:
+            raise AttributeError('A and/or b haven\'t been set yet.')
+
+        assert len(self.A) == len(self.A.T) == len(self.b)
+        if x0 is None:
+            x = np.zeros(len(self.A))
+        else:
+            x = np.copy(x0)
+        # ======================================================================
+        path = [x]
+
+        # First descent step ===================================================
+        r = self.b - np.dot(self.A, x)
+        # Check if close enough already
+        if la.norm(r) <= tol:
+            return x
+
+        # If not, take a step
+        Ar = np.dot(self.A, r)
+        a = np.inner(r.T, r) / np.dot(r.T, Ar)
+        x += a * r
+        path.append(x)
+
+        # Rest of descent ======================================================
+        for i in range(1, max_iter):
+            # Directly calculate residual every 'recalc' steps
+            if (i % recalc) == 0:
+                r = self.b - np.dot(self.A, x)
+            else:
+                # Else, update using one less matrix-vector product
+                r -= a * Ar
+
+            # Check if close enough
+            if r_norm <= tol: break
+
+            # If not, take another step
+            Ar = np.dot(self.A, r)
+            x += a * r
+            path.append(x)
+
+        return path
+
+class ConjugateGradientsSolver:
+    """
+    Conjugate gradients solver.
+
+    All arguments for constructor (A, b, full_output) are optional.
+        full_output defaults to False.
+
+    Methods:
+        cg.fit(A, b):
+            Sets A and b.
+
+        cg.conjugate_gradients(tol, x0, max_iter, recalc, x_true):
+            All arguments are optional, but A and b must have been set before
+            calling this method. A must be symmetric and positive-definite.
+
+        cg.path(tol, x0, max_iter, recalc):
+            Returns list of points traversed during descent (for visualization).
+    """
+
+    def __init__(self, A=None, b=None, full_output=False):
+        self.A = self.A
+        self.b = self.b
+        self.full_output = full_output
+
+    def __str__(self):
+        l1 = 'Conjugate Gradients Solver\n'
+        if self.A is None:
+            l2 = 'A: None; '
+        else:
+            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+        if self.b is None:
+            l2 += 'b: None\n'
+        else:
+            l2 += 'b: %d x %d\n' % (len(self.b), len(self.b.T))
+        if self.full_output:
+            l3 = 'full_output: True'
+        else:
+            l3 = 'full_output: False'
+        return l1+l2+l3
+
+    def __repr__(self):
+        return self.__str__()
+
+    def fit(self, A, b):
+        self.A
+        self.b
+
+    def conjugate_gradients(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
+        """
+        For SYMMETRIC, POSITIVE-DEFINITE matrices only.
+
+        If full_output=True and x_true is provided, this returns:
+            xopt:       optimal x (in numpy array)
+            n_iter:     number of iterations performed
+            resids:     for each iteration, its corresponding time and residual
+                            (in a list of tuples)
+            x_difs:     || x - x_true || at each iteration
+
+        If full_output=True and x_true is not provided:
+            xopt, n_iter, resids
+
+        If full_output=False:
+            xopt
+        """
+        print('FOR SYMMETRIC, POSITIVE-DEFINITE MATRICES!')
+        if self.A is None or self.b is None:
+            raise AttributeError('A and/or b haven\'t been set yet.')
+
+        assert len(self.A) == len(self.A.T) == len(self.b)
+        if x0 is None:
+            x = np.zeros(len(self.A))
+        else:
+            x = np.copy(x0)
+
+        if self.full_output:
+            return self.__cg_full(tol, x, max_iter, recalc, x_true)
+        else:
+            return self.__cg_full(tol, x, max_iter, recalc)
+
+
+    def __cg_full(self, tol, x, max_iter, recalc, x_true):
+        resids = []
+        start_time = time.time()
+        if x_true is not None:
+            x_difs = []
+
+        #d = r = self.b - np.dot(self.A, x)
+
+    def __cg_bare(self, tol, x, max_iter, recalc):
+        pass
+
+    def path(self, tol, x, max_iter, recalc):
+        pass
 
 # for symmetric, positive-definite A
 def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
@@ -379,6 +567,31 @@ def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_outpu
         return x, numIter, False, resids
     else:
         return x
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

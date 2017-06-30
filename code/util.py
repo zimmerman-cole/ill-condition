@@ -36,18 +36,6 @@ def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
     # Sparse? instead of np.diag(s)
     return np.dot(u, np.dot(np.diag(s), v))
 
-# Test if matrix is positive-definite
-def s_pos_def(A):
-    """
-    Returns True if A is positive-definite, False if not.
-
-    Tests that all of A's singular values are positive.
-
-    """
-    sing_vals = la.svd(A)[1]
-
-    return not any([i < 0 for i in sing_vals])
-
 def small_sing_vals(cond_num, m=50, n=50, max_sing=0.8):
     """
     Use to generate a matrix whose singular values all have magnitude less than
@@ -116,3 +104,15 @@ def ghetto_command_line():
             break
         except BaseException:
             traceback.print_exc()
+
+# Test if matrix is positive-definite
+def s_pos_def(A):
+    """
+    Returns True if A is positive-definite, False if not.
+
+    Tests that all of A's singular values are positive.
+
+    """
+    sing_vals = la.svd(A)[1]
+
+    return not any([i <= 0 for i in sing_vals])
