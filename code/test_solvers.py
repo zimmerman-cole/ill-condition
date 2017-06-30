@@ -303,7 +303,16 @@ def test_iter_eps(n, e=100, cond_num = 100, n_iter=500):
 # TODO: make code below more readable
 
 # Plot residuals vs iteration number
+
 def test_all(m, n, cond_num = 100, n_iter = 100):
+    """
+    Plots residuals vs iteration number for:
+        Conjugate Gradients
+        Iterative Refinement w/ constant epsilon
+
+    IR w/ const. epsilon doesn't work; residual just grows continually.
+        (even when (A+Ieps) is inverted directly)
+    """
     A = util.mat_from_cond(cond_num=cond_num, m=m, n=n)
     true_x = 4 * np.random.randn(n) # 4 is 'magic' number
     b = np.dot(A, true_x)
@@ -317,7 +326,7 @@ def test_all(m, n, cond_num = 100, n_iter = 100):
 
     # Iterative refinement
     start = time.time()
-    ir_results = optimize.iter_refinement(A, b, numIter=n_iter, full_output=True)
+    ir_results = optimize.iter_refinement_const_eps(A, b, numIter=n_iter, full_output=True)
     print('IR took %f seconds' % (time.time() - start))
     print('IR final error: %f' % ir_results[3][next(reversed(ir_results[3])) ])
 

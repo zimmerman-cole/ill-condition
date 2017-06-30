@@ -28,10 +28,23 @@ class GradientDescent:
         self.full_output = full_output
 
     def __str__(self):
-        pass
+        l1 = 'Gradient Descent Solver\n'
+        if self.A is None:
+            l2 = 'A: None; '
+        else:
+            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+        if self.b is None:
+            l2 += 'b: None\n'
+        else:
+            l2 += 'b: %d x %d\n' % (len(self.b), len(self.b.T))
+        if self.full_output:
+            l3 = 'full_output: True'
+        else:
+            l3 = 'full_output: False'
+        return l1+l2+l3
 
     def __repr__(self):
-        pass
+        return self.__str__()
 
     def fit(self, A, b):
         self.A = A
@@ -127,8 +140,6 @@ class GradientDescent:
         else:
             return x, i, residuals, path, x_difs
 
-
-
     def __gd_bare(self, tol, x, max_iter, recalc):
         """
         For max performance.
@@ -160,265 +171,6 @@ class GradientDescent:
             Ar = np.dot(self.A, r)
             x += a * r
 
-        return x
-
-# baseline; for symmetric, positive-definite A
-def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=False):
-    """
-    Standard gradient descent for SYMMETRIC, POSITIVE-DEFINITE matrices.
-
-    Re-calculates residual EVERY iteration (so slow but a bit more accurate).
-
-    Args:
-        numpy.ndarray A:    n x n transformation matrix.
-        numpy.ndarray b:    n x 1 "target values".
-        numpy.ndarray x:    n x 1 initial guess (optional).
-        int     numIter:    Number of passes over data.
-
-    Returns:
-        argmin(x) ||Ab - x||.
-    """
-    n = len(A)
-    if x is None: x = np.zeros(n)
-
-    if full_output:
-        resids = OrderedDict()
-        start_time = time.time()
-
-    # Start descent
-    for i in range(numIter):
-        if full_output:
-            resids[time.time() - start_time] = norm_dif(x, A, b)
-
-        # ACTUAL ALGORITHM
-        # ======================================================================
-        # calculate residual (direction of steepest descent)
-        r = b - np.dot(A, x)
-
-        # calculate step size (via line search)
-        a = np.inner(r.T, r) / float(np.inner(r.T, np.inner(A, r)))
-
-        # update x
-        x += a * r
-        # ======================================================================
-
-        if la.norm(b - np.dot(A, x)) < tol:
-            print('GD: Close enough at iter %d' % i)
-            if full_output:
-                resids[time.time() - start_time] = norm_dif(x, A, b)
-                return x, i, True, resids
-            else:
-                return x
-
-    print('GD: Max iteration reached (%d)' % numIter)
-    if full_output:
-        resids[time.time() - start_time] = norm_dif(x, A, b)
-        return x, numIter, False, resids
-    else:
-        return x
-
-# modification: 1 matrix-vector multiplication per iteration
-def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
-    """
-    Implementation of gradient descent for PSD matrices.
-
-    Notes:
-        Needs thorough testing.
-        Re-calculate residual EVERY iteration (so slow but a bit more accurate).
-        Only 1 matrix-vector computation is performed per iteration (vs 2).
-        Slow history tracking.
-
-    Args:
-        (numpy.ndarray)     A:    n x n transformation matrix.
-        (numpy.ndarray)     b:    n x 1 "target values".
-        (numpy.ndarray)    x0:    n x 1 initial guess (optional).
-        (numpy.ndarray) x_tru:    n x 1 true x (optional).
-        (int)         numIter:    Number of passes over data.
-
-    Returns:
-        argmin(x) ||Ax - b||_2.
-    """
-
-    n = len(A)
-
-    # Ensure sound inputs
-    assert len(A.T) == n
-    assert len(b) == n
-
-    # Working with (n, ) vectors, not (n, 1)
-    if len(b.shape) == 2: b = b.reshape(n, )
-    if x0 is None:
-        x0 = np.random.randn(n, )
-    else:
-        assert len(x0) == n
-        if len(x0.shape) == 2: x0 = x0.reshape(n, ) # (n, ) over (n, 1)
-
-    # diagnostics
-    x_hist = []
-
-    if full_output:
-        resids = []
-
-    # first descent step
-    x = x0
-    r_curr = b - np.dot(A, x)
-    Ar_curr = np.dot(A,r_curr)
-    a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
-    r_new = r_curr - a*Ar_curr
-    x += a * r_curr
-
-    if full_output:
-        x_hist.append(x)
-        if x_tru is not None:
-            err = la.norm(x-x_tru)
-        else:
-            err = la.norm(np.dot(A,x)-b)
-        resids.append(err)
-
-    # remaining descent steps
-    for _ in range(1,numIter):
-
-        # calculate residual (direction of steepest descent)
-        r_curr = r_new
-
-        # calculate step size (via analytic line search)
-        Ar_curr = np.inner(A, r_curr)
-        a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
-
-        # updates
-        x += a * r_curr
-        x_hist.append(x)
-
-        # calculate residuals for next step
-        if _ % recalc == 0:
-            r_new = b - np.dot(A, x)
-        else:
-            r_new = r_curr - a*Ar_curr
-
-        # add residuals
-        if x_tru is not None:
-            err = la.norm(x-x_tru)
-        else:
-            err = la.norm(np.dot(A,x)-b)
-        if full_output:
-            resids.append(err)
-
-        # stop if close
-        if err < tol:
-            print('GD_alt: Close enough at iter %d' % _)
-            print(la.norm(r_new))
-            if full_output:
-                return x, _, True, resids
-            else:
-                return x
-
-    print('GD_alt: Max iteration reached (%d)' % numIter)
-    if full_output:
-        return x, numIter, False, resids
-    else:
-        return x
-
-# modifications: 1 matrix-vector multiplication per iteration; nonsymmetric (square) matrix A
-def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
-    """
-    Implementation of gradient descent for nonsymmetric matrices (or symmetric, but slow in this case).
-
-    Notes:
-        Needs thorough testing; error BLOW UP
-        Re-calculate residual EVERY iteration (so slow but a bit more accurate).
-        Only 1 matrix-vector computation is performed per iteration (vs 2).
-        Slow history tracking.
-
-    Args:
-        (numpy.ndarray)     A:    n x n transformation matrix.
-        (numpy.ndarray)     b:    n x 1 "target values".
-        (numpy.ndarray)    x0:    n x 1 initial guess (optional).
-        (numpy.ndarray) x_tru:    n x 1 true x (optional).
-        (int)         numIter:    Number of passes over data.
-
-    Returns:
-        argmin(x) ||Ax - b||_2.
-    """
-
-    n = len(A)
-
-    # Ensure sound inputs
-    assert len(A.T) == n
-    assert len(b) == n
-
-    # Working with (n, ) vectors, not (n, 1)
-    if len(b.shape) == 2: b = b.reshape(n, )
-    if x0 is None:
-        x0 = np.random.randn(n, )
-    else:
-        assert len(x0) == n
-        if len(x0.shape) == 2: x0 = x0.reshape(n, ) # (n, ) over (n, 1)
-
-    # diagnostics
-    x_hist = []
-
-    if full_output:
-        resids = []
-
-    # first descent step
-    x = x0
-    AA = 1/2*A+A.T
-    r_curr = b - np.dot(AA, x)
-    Ar_curr = np.dot(AA,r_curr)
-    a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
-    r_new = r_curr - a*Ar_curr
-    x += a * r_curr
-
-    if full_output:
-        x_hist.append(x)
-        if x_tru is not None:
-            err = la.norm(x-x_tru)
-        else:
-            err = la.norm(np.dot(A,x)-b)
-        resids.append(err)
-
-    # remaining descent steps
-    for _ in range(1,numIter):
-
-        # calculate residual (direction of steepest descent)
-        r_curr = r_new
-
-        # calculate step size (via analytic line search)
-        AA = 1/2*A+A.T
-        Ar_curr = np.inner(AA, r_curr)
-        a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
-
-        # updates
-        x += a * r_curr
-        x_hist.append(x)
-
-        # calculate residuals for next step
-        if _ % recalc == 0:
-            r_new = b - np.dot(AA, x)
-        else:
-            r_new = r_curr - a*Ar_curr
-
-        # add residuals
-        if x_tru is not None:
-            err = la.norm(x-x_tru)
-        else:
-            err = la.norm(np.dot(A,x)-b)
-        if full_output:
-            resids.append(err)
-
-        # stop if close
-        if err < tol:
-            print('GD_alt: Close enough at iter %d' % _)
-            print(la.norm(r_new))
-            if full_output:
-                return x, _, True, resids
-            else:
-                return x
-
-    print('GD_alt: Max iteration reached (%d)' % numIter)
-    if full_output:
-        return x, numIter, False, resids
-    else:
         return x
 
 # for symmetric, positive-definite A
@@ -571,14 +323,16 @@ def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_outpu
     e: epsilon, value added to diagonal of A to lower condition number (decreases
                     w/ each iteration)
     """
-    m, n = len(A), len(A.T)
-    min_dim = min(m, n)
+    ATA = np.dot(A.T, A)
+    ATb = np.dot(A.T, b)
+
+    n = len(ATA)
     if x is None:
         x = np.zeros(n)
     if e is None:
-        e = 2*la.norm(A)
+        e = 2*la.norm(ATA)
 
-    min_err = (np.copy(x), norm_dif(x, A, b))
+    #min_err = (np.copy(x), norm_dif(x, A, b))
 
     if full_output:
         resids = OrderedDict()
@@ -590,41 +344,42 @@ def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_outpu
             print('IR iter %d; e: %f' % (i, e))
 
 
-        r = b - np.dot(A, x)
+        r = ATb - np.dot(ATA, x)
+        r_norm = la.norm(r)
 
         # break if residual blows up (becomes nan)
-        if la.norm(r) != la.norm(r):
+        if r_norm != r_norm:
             break
 
         if full_output:
-            resids[time.time() - start_time] = la.norm(r)
+            resids[time.time() - start_time] = r_norm
 
         # exit if close enough
-        if la.norm(r) < tol:
+        if r_norm < tol:
             if full_output:
-                return min_err[0], i, True, resids
+                return x, i, True, resids
             else:
-                return min_err[0]
+                return x
 
-        A_e = np.copy(A)
-        A_e[:min_dim, :min_dim] += e*np.identity(min_dim)
+        A_e = np.copy(ATA) + e * np.identity(n)
 
         #print('ITER REFINE %d' % i)
         #d = gradient_descent_helper(np.copy(A_e), np.copy(r), np.copy(x))
-        d = conjugate_gradient(np.copy(A_e), np.copy(r), x=np.copy(x))
+        #d = conjugate_gradient(np.copy(A_e), np.copy(r), x=np.copy(x))
 
 
-        x += d
+        x += np.dot(la.inv(A_e), r)
 
-        if norm_dif(x, A, b) < min_err[1]: min_err = (np.copy(x), norm_dif(x, A, b))
+        #if norm_dif(x, A, b) < min_err[1]: min_err = (np.copy(x), norm_dif(x, A, b))
 
 
     #print('IR: Max iteration reached (%d)' % numIter)
     if full_output:
         resids[time.time() - start_time] = norm_dif(x, A, b)
-        return min_err[0], numIter, False, resids
+        return x, numIter, False, resids
     else:
-        return min_err[0]
+        return x
+
 
 
 # ==============================================================================
@@ -840,7 +595,9 @@ def iter_refinement_const_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full
     assert len(A) == len(A.T)
     n = len(A)
 
-    if e is None: raise BaseException('epislon do')
+    if e is None:
+        print('MAGIC NUMEBR')
+        e = la.norm(A) / 2.0 # MAGIC NUMBER
     if x is None:
         x = np.zeros(n)
     if full_output:
@@ -849,17 +606,9 @@ def iter_refinement_const_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full
 
     A_eps = A + e*np.identity(n)
 
-    #prev_err = norm_dif(x, A, b) + 1
-
     for i in range(numIter):
-
-
         r = np.dot(A, x) - b
         r_norm = la.norm(r)
-        # if r_norm > prev_err:
-        #     break
-        # else:
-        #     prev_err = r_norm
 
         if full_output:
             resids[time.time() - st_time] = r_norm
@@ -870,16 +619,8 @@ def iter_refinement_const_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full
             else:
                 return x
 
-        #d = gradient_descent_helper(A_eps, r, x=x)
-        d = conjugate_gradient(np.copy(A_eps), np.copy(r), x=np.copy(x))
-        x -= d
-
-        # print('Iter %d' % i)
-        # print(x)
-        # print(d)
-        # print(r)
-        # raw_input()
-
+        #d = conjugate_gradient(np.copy(A_eps), np.copy(r), x=np.copy(x))
+        x -= np.dot(la.inv(A_eps), r)
 
     if full_output:
         return x, numIter, False, resids
@@ -887,7 +628,7 @@ def iter_refinement_const_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full
         return x
 
 # ==============================================================================
-# trash (we may find useful in the future somehow) below
+# GRADIENT DESCENT GRAVEYARD (?)
 
 def gradient_descent_helper(A, b, x, alpha=0.01, tol=0.1, verbose=0):
     """
@@ -930,3 +671,263 @@ def gradient_descent_helper(A, b, x, alpha=0.01, tol=0.1, verbose=0):
         print('time: %f' % (time.time() - start_time))
 
     return x
+
+# baseline; for symmetric, positive-definite A
+def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=False):
+    """
+    Standard gradient descent for SYMMETRIC, POSITIVE-DEFINITE matrices.
+
+    Re-calculates residual EVERY iteration (so slow but a bit more accurate).
+
+    Args:
+        numpy.ndarray A:    n x n transformation matrix.
+        numpy.ndarray b:    n x 1 "target values".
+        numpy.ndarray x:    n x 1 initial guess (optional).
+        int     numIter:    Number of passes over data.
+
+    Returns:
+        argmin(x) ||Ab - x||.
+    """
+    n = len(A)
+    if x is None: x = np.zeros(n)
+
+    if full_output:
+        resids = OrderedDict()
+        start_time = time.time()
+
+    # Start descent
+    for i in range(numIter):
+        if full_output:
+            resids[time.time() - start_time] = norm_dif(x, A, b)
+
+        # ACTUAL ALGORITHM
+        # ======================================================================
+        # calculate residual (direction of steepest descent)
+        r = b - np.dot(A, x)
+
+        # calculate step size (via line search)
+        a = np.inner(r.T, r) / float(np.inner(r.T, np.inner(A, r)))
+
+        # update x
+        x += a * r
+        # ======================================================================
+
+        if la.norm(b - np.dot(A, x)) < tol:
+            print('GD: Close enough at iter %d' % i)
+            if full_output:
+                resids[time.time() - start_time] = norm_dif(x, A, b)
+                return x, i, True, resids
+            else:
+                return x
+
+    print('GD: Max iteration reached (%d)' % numIter)
+    if full_output:
+        resids[time.time() - start_time] = norm_dif(x, A, b)
+        return x, numIter, False, resids
+    else:
+        return x
+
+# modification: 1 matrix-vector multiplication per iteration
+def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
+    """
+    Implementation of gradient descent for PSD matrices.
+
+    Notes:
+        Needs thorough testing.
+        Only 1 matrix-vector computation is performed per iteration (vs 2).
+        Slow history tracking.
+
+    Args:
+        (numpy.ndarray)     A:    n x n transformation matrix.
+        (numpy.ndarray)     b:    n x 1 "target values".
+        (numpy.ndarray)    x0:    n x 1 initial guess (optional).
+        (numpy.ndarray) x_tru:    n x 1 true x (optional).
+        (int)         numIter:    Number of passes over data.
+
+    Returns:
+        argmin(x) ||Ax - b||_2.
+    """
+
+    n = len(A)
+
+    # Ensure sound inputs
+    assert len(A.T) == n
+    assert len(b) == n
+
+    # Working with (n, ) vectors, not (n, 1)
+    if len(b.shape) == 2: b = b.reshape(n, )
+    if x0 is None:
+        x0 = np.random.randn(n, )
+    else:
+        assert len(x0) == n
+        if len(x0.shape) == 2: x0 = x0.reshape(n, ) # (n, ) over (n, 1)
+
+    # diagnostics
+    x_hist = []
+
+    if full_output:
+        resids = []
+
+    # first descent step
+    x = x0
+    r_curr = b - np.dot(A, x)
+    Ar_curr = np.dot(A,r_curr)
+    a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
+    r_new = r_curr - a*Ar_curr
+    x += a * r_curr
+
+    if full_output:
+        x_hist.append(x)
+        if x_tru is not None:
+            err = la.norm(x-x_tru)
+        else:
+            err = la.norm(np.dot(A,x)-b)
+        resids.append(err)
+
+    # remaining descent steps
+    for _ in range(1,numIter):
+
+        # calculate residual (direction of steepest descent)
+        r_curr = r_new
+
+        # calculate step size (via analytic line search)
+        Ar_curr = np.inner(A, r_curr)
+        a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
+
+        # updates
+        x += a * r_curr
+        x_hist.append(x)
+
+        # calculate residuals for next step
+        if _ % recalc == 0:
+            r_new = b - np.dot(A, x)
+        else:
+            r_new = r_curr - a*Ar_curr
+
+        # add residuals
+        if x_tru is not None:
+            err = la.norm(x-x_tru)
+        else:
+            err = la.norm(np.dot(A,x)-b)
+        if full_output:
+            resids.append(err)
+
+        # stop if close
+        if err < tol:
+            print('GD_alt: Close enough at iter %d' % _)
+            print(la.norm(r_new))
+            if full_output:
+                return x, _, True, resids
+            else:
+                return x
+
+    print('GD_alt: Max iteration reached (%d)' % numIter)
+    if full_output:
+        return x, numIter, False, resids
+    else:
+        return x
+
+# modifications: 1 matrix-vector multiplication per iteration; nonsymmetric (square) matrix A
+def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
+    """
+    Implementation of gradient descent for nonsymmetric matrices (or symmetric, but slow in this case).
+
+    Notes:
+        Needs thorough testing; error BLOW UP
+        Re-calculate residual EVERY iteration (so slow but a bit more accurate).
+        Only 1 matrix-vector computation is performed per iteration (vs 2).
+        Slow history tracking.
+
+    Args:
+        (numpy.ndarray)     A:    n x n transformation matrix.
+        (numpy.ndarray)     b:    n x 1 "target values".
+        (numpy.ndarray)    x0:    n x 1 initial guess (optional).
+        (numpy.ndarray) x_tru:    n x 1 true x (optional).
+        (int)         numIter:    Number of passes over data.
+
+    Returns:
+        argmin(x) ||Ax - b||_2.
+    """
+
+    n = len(A)
+
+    # Ensure sound inputs
+    assert len(A.T) == n
+    assert len(b) == n
+
+    # Working with (n, ) vectors, not (n, 1)
+    if len(b.shape) == 2: b = b.reshape(n, )
+    if x0 is None:
+        x0 = np.random.randn(n, )
+    else:
+        assert len(x0) == n
+        if len(x0.shape) == 2: x0 = x0.reshape(n, ) # (n, ) over (n, 1)
+
+    # diagnostics
+    x_hist = []
+
+    if full_output:
+        resids = []
+
+    # first descent step
+    x = x0
+    AA = 1/2*A+A.T
+    r_curr = b - np.dot(AA, x)
+    Ar_curr = np.dot(AA,r_curr)
+    a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
+    r_new = r_curr - a*Ar_curr
+    x += a * r_curr
+
+    if full_output:
+        x_hist.append(x)
+        if x_tru is not None:
+            err = la.norm(x-x_tru)
+        else:
+            err = la.norm(np.dot(A,x)-b)
+        resids.append(err)
+
+    # remaining descent steps
+    for _ in range(1,numIter):
+
+        # calculate residual (direction of steepest descent)
+        r_curr = r_new
+
+        # calculate step size (via analytic line search)
+        AA = 1/2*A+A.T
+        Ar_curr = np.inner(AA, r_curr)
+        a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
+
+        # updates
+        x += a * r_curr
+        x_hist.append(x)
+
+        # calculate residuals for next step
+        if _ % recalc == 0:
+            r_new = b - np.dot(AA, x)
+        else:
+            r_new = r_curr - a*Ar_curr
+
+        # add residuals
+        if x_tru is not None:
+            err = la.norm(x-x_tru)
+        else:
+            err = la.norm(np.dot(A,x)-b)
+        if full_output:
+            resids.append(err)
+
+        # stop if close
+        if err < tol:
+            print('GD_alt: Close enough at iter %d' % _)
+            print(la.norm(r_new))
+            if full_output:
+                return x, _, True, resids
+            else:
+                return x
+
+    print('GD_alt: Max iteration reached (%d)' % numIter)
+    if full_output:
+        return x, numIter, False, resids
+    else:
+        return x
+
+# ==============================================================================
