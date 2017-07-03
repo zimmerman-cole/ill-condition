@@ -29,7 +29,33 @@ class Solver:
 
     def solve(self, tol=10**-5, x0 = None, max_iter = 500, x_true = None, **kwargs):
         """
-        kwargs: solver-specific parameters (i.e. recalc for GD, CG; epsilon for IR)
+        Solve the linear system Ax = b for x.
+
+        Args:
+            (number)         tol:   Desired degree of accuracy (||residual|| <= tol).
+            (np.array)        x0:   Initial guess for x.
+            (int)       max_iter:   Maximum number of iterations.
+            (np.array)    x_true:   True solution to system. If provided (and
+                                      full_output=True), the solver tracks
+                                      ||x - x_true|| at each iteration.
+                          kwargs:   Solver-specific parameters, e.g.
+                                        -'eps' for iterative refinement
+                                        -'recalc' for GD/CG
+
+        Returns:
+            If full_output=True and x_true is provided:
+                (np.array)                   x:   The approximated solution.
+                (int)                   n_iter:   Number of iterations taken.
+                ([(float, float)])   residuals:   For each iteration, a tuple
+                                                    containing the size of the
+                                                    current residual and time elapsed
+                                                    so far.
+                ([float])               x_difs:   ||x - x_true|| at each iteration.
+
+            If full_output=True and x_true is not provided, only x, n_iter and
+                residuals are returned.
+
+            If full_output=False, just x is returned.
         """
         self._check_ready()
         if x0 is None:
@@ -43,10 +69,10 @@ class Solver:
             return self._bare(tol, x, max_iter, **kwargs)
 
     def _full(*args, **kwargs):
-        print('Not implemented?')
+        print('_full not implemented?')
 
     def _bare(*args, **kwargs):
-        print('Not implemented?')
+        print('_bare not implemented?')
 
     def test_methods(self):
         """
@@ -59,6 +85,7 @@ class Solver:
         print('Full-bare: %f' % la.norm(x_full - x_bare))
         print('Full-path: %f' % la.norm(x_full - x_path))
         print('Bare-path: %f' % la.norm(x_bare - x_path))
+        #print(la.norm(np.dot(la.inv(self.A), self.b) - x_full))
 
 # || b - Ax ||
 def norm_dif(x, *args):
@@ -70,15 +97,11 @@ def norm_dif(x, *args):
 
 class GradientDescentSolver(Solver):
     """
-    Gradient descent solver.
+    Gradient descent solver. Only works for SYMMETRIC, POSITIVE-DEFINITE matrices.
 
-    Methods:
-        gd.gradient_descent(tol, x0, max_iter, recalc, x_true):
-            All arguments are optional, but A and b must have been set before
-            calling this method. A must be symmetric and positive-definite.
-
-        gd.path(tol, x0, max_iter, recalc):
-            Returns list of points traversed during descent (for visualization).
+    Extra parameter(s) for Solver.solve(...):
+        (int) recalc:   Directly recalculate the residual b - Ax every 'recalc'
+                            iterations.
     """
 
     def __str__(self):
@@ -256,22 +279,10 @@ class ConjugateGradientsSolver(Solver):
     """
     Conjugate gradients solver.
 
-    Methods:
-        cg.fit(A, b):
-            Sets A and b.
-
-        cg.conjugate_gradients(tol, x0, max_iter, recalc, x_true):
-            All arguments are optional, but A and b must have been set before
-            calling this method. A must be symmetric and positive-definite.
-
-        cg.path(tol, x0, max_iter, recalc):
-            Returns list of points traversed during descent (for visualization).
+    Extra parameter(s) for Solver.solve(...):
+        (int) recalc:   Directly recalculate the residual b - Ax every 'recalc'
+                            iterations.
     """
-
-    # def __init__(self, A=None, b=None, full_output=False):
-    #     self.A = A
-    #     self.b = b
-    #     self.full_output = full_output
 
     def __str__(self):
         l1 = 'Conjugate Gradients Solver\n'
@@ -451,6 +462,7 @@ class ConjugateGradientsSolver(Solver):
 
         return path
 
+# TODO: add parameter governing epsilon's decay rate
 class IterativeRefinementSolver(Solver):
 
     def __str__(self):
@@ -496,7 +508,7 @@ class IterativeRefinementSolver(Solver):
             i += 1
 
             eps *= 0.5
-            A_e = np.copy(self.A) + eps * np.identity(len(self.A))
+            A_e = self.A + eps * np.identity(len(self.A))
 
 
             x += np.dot(la.inv(A_e), r)
@@ -504,10 +516,60 @@ class IterativeRefinementSolver(Solver):
             if x_true is not None:
                 x_difs.append(la.norm(x - x_true))
 
+        print(x)
         if x_true is None:
             return x, i, residuals
         else:
             return x, i, residuals, x_difs
+
+    def _bare(self, tol, x, max_iter, **kwargs):
+        if 'eps' not in kwargs:
+            eps = 2 * la.norm(self.A)
+        else:
+            eps = float(kwargs['eps'])
+
+        for i in range(max_iter):
+            r = self.b - np.dot(self.A, x)
+
+            if la.norm(r) <= tol:
+                break
+
+            eps *= 0.5
+            A_e = self.A + eps * np.identity(len(self.A))
+
+            x += np.dot(la.inv(A_e), r)
+
+        print(x)
+        return x
+
+    def path(self, tol=10**-5, x0=None, max_iter = 500, **kwargs):
+        if 'eps' not in kwargs:
+            eps = 2 * la.norm(self.A)
+        else:
+            eps = float(kwargs['eps'])
+
+        self._check_ready()
+        if x0 is None:
+            x = np.zeros(len(self.A))
+        else:
+            x = np.copy(x0)
+
+        path = [x]
+
+        for i in range(max_iter):
+            r = self.b - np.dot(self.A, x)
+
+            if la.norm(r) <= tol:
+                break
+
+            eps *= 0.5
+            A_e = self.A + eps * np.identity(len(self.A))
+
+            x += np.dot(la.inv(A_e), r)
+            path.append(x)
+
+        print(path[0])
+        return x
 
 # TO DO: BiCGStab
 
