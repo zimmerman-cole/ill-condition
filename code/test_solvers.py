@@ -13,19 +13,8 @@ from collections import OrderedDict
 # cond_num:   (int):  condition number
 #        m:   (int):  rows of `A`
 #        n:   (int):  cols of `A`
-#        A:  (list):  *option* for particular `A`
-#                       or list of `A` matrices
-#        b:  (list):  *option* for particular `b`
-#                       or list of `b` vectors
-#      x_0:  (list):  *option* for particular `x_0`
-#                       or list of `x_0` vectors
-#   x_true:  (list):  *option* for particular `x_true`
-#                       or list of `x_true` vectors
 #   solver:   (str):  which solver type to run sims
 ## =================== PLOTTING PARAMS =================== ##
-#   p_type:   (int):  plot type
-#                       0: resids, 1: errs, 2: both
-# 
 #    p_xax:  (bool):  x-axis option
 #                       0: iteration, 1: time
 ## ==================== EXPORT PARAMS ==================== ##
@@ -35,17 +24,14 @@ from collections import OrderedDict
 
 class Tester:
     def __init__(self, \
-                 n_sims=None, cond_num=None, m=None, n=None, x_0=None, x_true = None, solver=None, \
-                 p_type=None, p_xax=None, \
+                 n_sims=None, cond_num=None, m=None, n=None, solver=None, \
+                 p_xax=None, \
                  e_name=None \
                 ):
         
-        self.n_sims, self.cond_num, self.m, self.n = n_sims, cond_num, m, n
-        # self.A = A, self.b = b
-        self.x_0, self.x_true = x_0, x_true
-        self.solver = solver
+        self.n_sims, self.cond_num, self.m, self.n, self.solver = n_sims, cond_num, m, n, solver
 
-        self.p_type, self.p_xax = p_type, p_xax
+        self.p_xax = p_xax
 
         self.e_name = e_name
 
@@ -64,42 +50,33 @@ class Tester:
         if self.n is None: l5 = 'n: None;\n'
         else: l5 = 'n: %d;\n' % self.n
         
-        # # if self.A is None: l6 = 'A: None\n'
-        # else: l6 += 'A: %d-list of %d x %d\n static matrices' % (len(A), len(self.A[0]), len(self.A[0].T))
+        if self.p_xax is None: l6 = 'p_xax: None\n'
+        else: l6 = 'p_xax: %s\n' % p_xax
         
-        # # if self.b is None: l7 = 'b: None\n'
-        # else: l7 = 'b: %d-list of %d x %d\n static vectors' % (len(b), len(self.b[0]), len(self.b[0].T))
-
-        if self.p_type is None: l6 = 'p_type: None\n'
-        else: l6 = 'p_type: %s\n' % p_type
-
-        if self.p_xax is None: l7 = 'p_xax: None\n'
-        else: l7 = 'p_xax: %s\n' % p_xax
-        
-        # return l1+l2+l3+l4+l5+l6+l7
         return l1+l2+l3+l4+l5+l6+l7
 
     def __repr__(self):
         return self.__str__()
 
-    def fit(self, n_sims, cond_num, m, n, p_type, p_xax):
+    def fit(self, n_sims, cond_num, m, n, p_xax):
         """
         Fit for random simulations
         """
-        self.n_sims = n_sims
-        self.cond_num = cond_num
-        self.m = m
-        self.n = n
-        # self.A = A
-        # self.b = b
-
-        self.p_type = p_type
+        self.n_sims, self.cond_num, self.m, self.n = n_sims, cond_num, m, n
+        self.A, self.b, self.x_0, self.x_true = None, None, None, None
+        
         self.p_xax = p_xax
 
         fit_time = datetime.datetime.fromtimestamp( time.time() ).strftime('%Y-%m-%d_%H.%M.%S')
-        self.e_name = "rand_%s_%sx%s_%s" % (self.cond_num, self.m, self.n, fit_time)
+        self.e_name = "%s_%sx%s_%s" % (self.cond_num, self.m, self.n, fit_time)
 
-    # def gen_data()
+    def gen_data(self):
+        self.A, self.b, self.x_0, self.x_true = [], [], [], []
+        for sim in range(self.n_sims):
+            self.A.append( util.psd_from_cond(self.cond_num,self.n) )
+            self.x_true.append( np.random.randn(self.n) )
+            self.x_0.append( np.random.randn(self.n) )
+            self.b.append( np.dot(self.A[sim],self.x_true[sim]) )
 
     def test_spsd(self,solver):
         """
@@ -116,71 +93,92 @@ class Tester:
         x_opt_out = []
         i_out = []
         residuals_out = []
-        if self.x_true is not None: errors_out = []
+        errors_out = []
         path_out = []
 
         ## initialize plots
-        fig = plt.figure()
-        ax = plt.subplot()
-
+        fig_residuals = plt.figure("residuals")
+        ax_residuals = plt.subplot(111)
+        fig_errors = plt.figure("errors")
+        ax_errors = plt.subplot(111)
+        
         ## simulations
         for sim in range(self.n_sims):
             ## tracking
-            print("==================== Simulation: %s ====================" % sim)
+            print("==================== Simulation: %s ====================\n" % sim)
+            ## error checking
+            if self.A is None or self.b is None or self.x_0 is None or self.x_true is None:
+                raise AttributeError('data (A, b, x_0, x_true) haven\'t been generated yet.')
 
             ## formulate problem instance
-            A = util.psd_from_cond(self.cond_num,self.n)
-            x_true = np.random.randn(self.n)
-            x_0 = np.random.randn(self.n)
-            b = np.dot(A,x_true)
+            A = np.copy(self.A[sim])
+            x_true = np.copy(self.x_true[sim])
+            x_0 = np.copy(self.x_0[sim])
+            b = np.copy(self.b[sim])
             
             ## instantiate solver object
-            solver_object = self.solver(A=A,b=b,full_output=True)
+            solver_object = self.solver(A=A, b=b, full_output=True)
             
             ## solve simulated problem
-            if self.x_true: 
-                x_opt, i, residuals, errors = solver_object.solve(tol=10**-5, x0=x_0, max_iter=500, recalc=20, x_true=x_true)
-            else: 
-                x_opt, i, residuals= solver_object.solve()
-            path = solver_object.path(self, x0=self.x_0, max_iter=500, recalc=20)
+            x_opt, i, residuals, errors = solver_object.solve(tol=10**-5, x_0=x_0, max_iter=500, recalc=20, x_true=x_true)
+            path = solver_object.path(self, x_0=x_0, max_iter=500, recalc=20)
             
             ## append output
             x_opt_out.append(x_opt)
             i_out.append(i)
             residuals_out.append(residuals)
-            if self.x_true:
-                errors_out.append(errors)
+            errors_out.append(errors)
             path_out.append(path)
 
-            ## initialize x,y vectors for plot
-            residuals_indiv = [x[0] for x in residuals]
-            ylab = "Residual ||Ax - b||"
+            ## set axes
             if self.p_xax == 0: 
                 xax = range(len(residuals))
                 xlab = "Iteration"
             else: 
                 xax = [x[1] for x in residuals]
                 xlab = "Time"
+
+            ## y vectors 
+            y_residuals = [x[0] for x in residuals]  # residuals
+            ylab_residuals = "Residual ||Ax - b||"   # residuals
+            y_errors = [x[0] for x in residuals]     # errors
+            ylab_errors = "Error ||x - x_true||"     # errors
             
-            ## add to plot
-            ax.plot(xax, residuals_indiv, label='sim-%s resids' % sim)
+            ## plot residuals
+            plt.figure("residuals")
+            ax_residuals.plot(xax, y_residuals, label='sim-%s resids' % sim)
             plt.yscale('log')
             plt.xlabel(xlab)
-            plt.ylabel(ylab)
+            plt.ylabel(ylab_residuals)
+            
+            ## plot errors
+            plt.figure("errors")
+            ax_errors.plot(xax, y_errors, label='sim-%s errs' % sim)
+            plt.yscale('log')
+            plt.xlabel(xlab)
+            plt.ylabel(ylab_errors)
+                
+        ## save plot(s)
+        path_out = "../test_results/"+str(solver_name)+"/"+self.e_name
+        if not os.path.exists(path_out):
+            os.makedirs(path_out)
 
-        ## save plot 
-        out_name = "../test_results/"+str(solver_name)+"/"+self.e_name
-        if not os.path.exists(out_name):
-            os.makedirs(out_name)
+        plt.figure("residuals")
         plt.title('%s Simulation Results' % (solver_name))
-        ax.legend()
-        plt.show()
-        fig.savefig(out_name+'/resids.png')
+        ax_residuals.legend()
+        fig_residuals.savefig(path_out+'/residuals.png')
+        
+        plt.figure("errors")
+        plt.title('%s Simulation Results' % (solver_name))
+        ax_errors.legend()
+        fig_errors.savefig(path_out+'/errors.png')
 
 t = Tester()
-t.fit(n_sims=3, cond_num=25, m=10, n=10, p_type=0, p_xax=0)
+t.fit(n_sims=3, cond_num=25, m=10, n=10, p_xax=1)
+t.gen_data()
 s = "GradientDescentSolver"
 t.test_spsd(s)
+
 
 
 
