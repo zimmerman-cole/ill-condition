@@ -1,11 +1,19 @@
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
-import time
+import time, optimize, util
 
 """
-Temporary holding place for stuff/stuff that doesn't fit anywhere else.
+Temporary holding place for stuff /// stuff that doesn't fit anywhere else.
 """
+
+# || b - Ax ||
+def norm_dif(x, *args):
+    """
+    Return || b - Ax || (Frobenius norm).
+    """
+    A, b = args
+    return la.norm(b - np.dot(A, x))
 
 def compare_gd():
     """
@@ -18,9 +26,7 @@ def compare_gd():
 
     gd_e, alt_e, non_e, cl_e = 0, 0, 0, 0
 
-    gd = optimize.GradientDescent(full_output=True)
-    print(str(gd))
-    sys.exit(0)
+    gd = optimize.GradientDescentSolver(full_output=True)
 
     for i in range(100):
         A = util.psd_from_cond(cond_num=100, n=100)
@@ -55,8 +61,8 @@ def compare_gd():
         print('GD error: %f (%d iter)' % (gd_err, n_iter))
 
         st_time = time.time()
-        gd.fit(A, b)
-        cl_opt, n_iter, resids, path = gd.gradient_descent()
+        gd.A, gd.b = A, b
+        cl_opt, n_iter, resids = gd.solve()
         cl_time = time.time() - st_time
         cl_err = norm_dif(cl_opt, A, b)
         cl_e += cl_err
@@ -105,14 +111,18 @@ def plot_iter_refine(cond_num=1000, m=100, n=100):
 
 def compare_cg(plot=True):
     """
-    Compare optimize.conjugate_gradient_ideal and
-        optimize.conjugate_gradient_psd.
+    Compare optimize.conjugate_gradient_ideal, optimize.conjugate_gradient_psd
+        and optimize.ConjugateGradientsSolver.
     """
+
+    cgs = optimize.ConjugateGradientsSolver(full_output=True)
 
     psd_avg_err = 0
     psd_avg_time = 0
     id_avg_err = 0
     id_avg_time = 0
+    cl_avg_err = 0
+    cl_avg_time = 0
 
     for i in range(100):
         A = util.psd_from_cond(cond_num=1000, n=100)
@@ -141,19 +151,35 @@ def compare_cg(plot=True):
             print('PSD final error: %f (%d iter)' % (psd_err, n_iter))
             print('PSD time: %f' % psd_time)
 
+        st_time = time.time()
+        cgs.A, cgs.b = A, b
+        xopt, n_iter, cl_resids = cgs.conjugate_gradients()
+        #cl_t, cl_r = [i[1] for i in cl_resids], [i[0] for i in cl_resids]
+        cl_err = norm_dif(xopt, A, b)
+        cl_avg_err += cl_err
+        cl_time = time.time() - st_time
+        cl_avg_time += cl_time
+        if plot:
+            print('Solver final error: %f (%d iter)' % (cl_err, n_iter))
+            print('Solver time: %f' % cl_time)
+
         if plot:
             plt.plot(id_resids.keys(), id_resids.values(), marker='o')
-            plt.plot(psd_resids.keys(), psd_resids.values(), marker='o')
+            #plt.plot(psd_resids.keys(), psd_resids.values(), marker='o')
+            plt.plot([i[1] for i in cl_resids], [i[0] for i in cl_resids], marker='o')
             plt.yscale('log')
             plt.ylabel('Residual ||Ax - b||')
             plt.xlabel('Time')
-            plt.legend(['IDEAL', 'PSD'])
+            plt.legend(['IDEAL', 'SOLVER'])
+            #plt.legend(['IDEAL', 'PSD', 'SOLVER'])
             plt.show()
 
     psd_avg_time /= 100.0
     psd_avg_err /= 100.0
     id_avg_time /= 100.0
     id_avg_err /= 100.0
+    cl_avg_err /= 100.0
+    cl_avg_time /= 100.0
 
     print('IDEAL: ==============')
     print('Avg time: %f' % id_avg_time)
@@ -161,3 +187,6 @@ def compare_cg(plot=True):
     print('PSD: =======')
     print('Avg time: %f' % psd_avg_time)
     print('Avg err: %f' % psd_avg_err)
+    print('SOLVER =================')
+    print('Avg time: %f' % cl_avg_time)
+    print('Avg err: %f' % cl_avg_err)

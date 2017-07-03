@@ -6,34 +6,57 @@ from collections import OrderedDict
 from sklearn.linear_model import SGDClassifier
 
 
-# class Solver:
-#     """
-#     Parent class for linear solvers implemented here.
-#     """
-#
-#     def __init__(self, A=None, b=None, \
-#                  tol=10**-5, max_iter=500, \
-#                  x_true=None):
-#         self.A, self.b = A, b
-#         self.tol = tol
-#         self.max_iter = max_iter
-#         self.x_true = x_true
-#
-#     def __check_ready(self):
-#         """
-#         Check everything's in place to start optimization. Does NOT
-#         check A is symmetric, positive-definite, or even square.
-#         """
-#         if self.A is None or self.b is None:
-#             raise AttributeError('A and/or b haven\'t been set yet.')
-#         if len(self.A) != len(self.b):
-#             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
-#
-#     def __resid_norm(self, x):
-#         """
-#         || b - Ax || (Frobenius norm)
-#         """
-#         return la.norm(self.b - np.dot(self.A, x))
+class Solver:
+    """
+    Parent class for linear solvers.
+    """
+
+    def __init__(self, A=None, b=None, \
+                 tol=10**-5, max_iter=500, \
+                 x_true=None, full_output=False, \
+                 recalc=20):
+        self.A, self.b = A, b
+        self.tol = tol
+        self.max_iter = max_iter
+        self.x_true = x_true
+        self.full_output = full_output
+        self.recalc = recalc
+
+    def _check_ready(self):
+        """
+        Check everything's in place to start optimization. DOES NOT
+        check A is symmetric, positive-definite, or even square.
+
+        Should preferably be overridden by child solver.
+        """
+        if self.A is None or self.b is None:
+            raise AttributeError('A and/or b haven\'t been set yet.')
+        if len(self.A) != len(self.b):
+            raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
+
+    def __resid_norm(self, x):
+        """
+        || b - Ax || (Frobenius norm)
+        """
+        return la.norm(self.b - np.dot(self.A, x))
+
+    def solve(self, tol=10**-5, x0 = None, max_iter = 500, recalc = 20, x_true = None):
+        self._check_ready()
+        if x0 is None:
+            x = np.zeros(len(self.A))
+        else:
+            x = np.copy(x0)
+
+        if self.full_output:
+            return self._full(tol, x, max_iter, recalc, x_true)
+        else:
+            return self._bare(tol, x, max_iter, recalc)
+
+    def _full(*args, **kwargs):
+        print('Not implemented?')
+
+    def _bare(*args, **kwargs):
+        print('Not implemented?')
 
 # || b - Ax ||
 def norm_dif(x, *args):
@@ -43,7 +66,7 @@ def norm_dif(x, *args):
     A, b = args
     return la.norm(b - np.dot(A, x))
 
-class GradientDescentSolver:
+class GradientDescentSolver(Solver):
     """
     Gradient descent solver.
 
@@ -51,9 +74,6 @@ class GradientDescentSolver:
         full_output defaults to False.
 
     Methods:
-        gd.fit(A, b):
-            Sets A and b.
-
         gd.gradient_descent(tol, x0, max_iter, recalc, x_true):
             All arguments are optional, but A and b must have been set before
             calling this method. A must be symmetric and positive-definite.
@@ -61,11 +81,6 @@ class GradientDescentSolver:
         gd.path(tol, x0, max_iter, recalc):
             Returns list of points traversed during descent (for visualization).
     """
-
-    def __init__(self, A=None, b=None, full_output=False):
-        self.A = A
-        self.b = b
-        self.full_output = full_output
 
     def __str__(self):
         l1 = 'Gradient Descent Solver\n'
@@ -85,13 +100,6 @@ class GradientDescentSolver:
 
     def __repr__(self):
         return self.__str__()
-
-    def fit(self, A, b):
-        """
-        "Fit"
-        """
-        self.A = A
-        self.b = b
 
     def gradient_descent(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
         """
@@ -129,7 +137,7 @@ class GradientDescentSolver:
         else:
             return self.__gd_bare(tol=tol, x=x, max_iter=max_iter, recalc=recalc)
 
-    def __gd_full(self, tol, x, max_iter, recalc, x_true):
+    def _full(self, tol, x, max_iter, recalc, x_true):
         """
         Tracks everything (times/iteration, residuals, etc.).
 
@@ -148,9 +156,9 @@ class GradientDescentSolver:
         # Check if close enough already
         if r_norm <= tol:
             if x_true is None:
-                return x, i, residuals
+                return x, 0, residuals
             else:
-                return x, i, residuals, x_difs
+                return x, 0, residuals, x_difs
 
         # If not, take a step
         i = 1
@@ -187,7 +195,7 @@ class GradientDescentSolver:
         else:
             return x, i, residuals, x_difs
 
-    def __gd_bare(self, tol, x, max_iter, recalc):
+    def _bare(self, tol, x, max_iter, recalc):
         """
         For max performance.
         """
@@ -212,7 +220,7 @@ class GradientDescentSolver:
                 r -= a * Ar
 
             # Check if close enough
-            if r_norm <= tol: break
+            if la.norm(r) <= tol: break
 
             # If not, take another step
             Ar = np.dot(self.A, r)
@@ -287,8 +295,8 @@ class ConjugateGradientsSolver:
     """
 
     def __init__(self, A=None, b=None, full_output=False):
-        self.A = self.A
-        self.b = self.b
+        self.A = A
+        self.b = b
         self.full_output = full_output
 
     def __str__(self):
@@ -309,10 +317,6 @@ class ConjugateGradientsSolver:
 
     def __repr__(self):
         return self.__str__()
-
-    def fit(self, A, b):
-        self.A
-        self.b
 
     def conjugate_gradients(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
         """
@@ -348,12 +352,63 @@ class ConjugateGradientsSolver:
 
 
     def __cg_full(self, tol, x, max_iter, recalc, x_true):
-        resids = []
         start_time = time.time()
         if x_true is not None:
             x_difs = []
 
-        #d = r = self.b - np.dot(self.A, x)
+        # First descent step (gradient descent step) ===========================
+        r = self.b - np.dot(self.A, x)
+        r_norm = la.norm(r)
+        residuals = [(r_norm, time.time() - start_time)]
+
+        # Check if close enough already
+        if r_norm <= tol:
+            if x_true is None:
+                return x, 0, residuals
+            else:
+                return x, 0, residuals, x_difs
+
+        # If not, take a step
+        rTr = np.dot(r.T, r)
+        i = 1
+        d = np.copy(r)  # First search direction is just the residual
+        Ad = np.dot(self.A, d)
+        a = rTr / np.dot(d.T, Ad)
+        x += a * d
+        # ======================================================================
+
+        while i < max_iter:
+            if (i % recalc) == 0:
+                new_r = self.b - np.dot(self.A, x)
+            else:
+                new_r = r - (a * Ad)
+
+            r_norm = la.norm(new_r)
+            residuals.append((r_norm, time.time() - start_time))
+
+            # Check if close enough
+            if r_norm < tol:
+                break
+
+            i += 1
+
+            # If not, take a step
+            new_rTr = np.dot(new_r.T, new_r)
+            beta = new_rTr / rTr
+
+            d = new_r + beta * d
+            r, rTr = new_r, new_rTr
+            Ad = np.dot(self.A, d)
+
+            a = rTr / np.dot(d.T, Ad)
+
+            x += a * d
+
+        if x_true is None:
+            return x, i, residuals
+        else:
+            return x, i, residuals, x_difs
+
 
     def __cg_bare(self, tol, x, max_iter, recalc):
         pass
