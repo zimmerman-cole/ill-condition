@@ -11,16 +11,9 @@ class Solver:
     Parent class for linear solvers.
     """
 
-    def __init__(self, A=None, b=None, \
-                 tol=10**-5, max_iter=500, \
-                 x_true=None, full_output=False, \
-                 recalc=20):
+    def __init__(self, A=None, b=None, full_output=False):
         self.A, self.b = A, b
-        self.tol = tol
-        self.max_iter = max_iter
-        self.x_true = x_true
         self.full_output = full_output
-        self.recalc = recalc
 
     def _check_ready(self):
         """
@@ -33,12 +26,6 @@ class Solver:
             raise AttributeError('A and/or b haven\'t been set yet.')
         if len(self.A) != len(self.b):
             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
-
-    def __resid_norm(self, x):
-        """
-        || b - Ax || (Frobenius norm)
-        """
-        return la.norm(self.b - np.dot(self.A, x))
 
     def solve(self, tol=10**-5, x0 = None, max_iter = 500, recalc = 20, x_true = None):
         self._check_ready()
@@ -57,6 +44,18 @@ class Solver:
 
     def _bare(*args, **kwargs):
         print('Not implemented?')
+
+    def test_methods(self):
+        """
+        Make sure _full, _bare and path give roughly the same x.
+        """
+        x_full = self._full(tol=10**-5, x=np.zeros(len(self.A)), max_iter=500, recalc=20, x_true=None)[0]
+        x_bare = self._bare(tol=10**-5, x=np.zeros(len(self.A)), max_iter=500, recalc=20)
+        x_path = self.path(tol=10**-5, x0=np.zeros(len(self.A)), max_iter=500, recalc=20)[-1]
+
+        print('Full-bare: %f' % la.norm(x_full - x_bare))
+        print('Full-path: %f' % la.norm(x_full - x_path))
+        print('Bare-path: %f' % la.norm(x_bare - x_path))
 
 # || b - Ax ||
 def norm_dif(x, *args):
@@ -266,7 +265,7 @@ class GradientDescentSolver(Solver):
                 r -= a * Ar
 
             # Check if close enough
-            if r_norm <= tol: break
+            if la.norm(r) <= tol: break
 
             # If not, take another step
             Ar = np.dot(self.A, r)
@@ -354,7 +353,7 @@ class ConjugateGradientsSolver:
     def __cg_full(self, tol, x, max_iter, recalc, x_true):
         start_time = time.time()
         if x_true is not None:
-            x_difs = []
+            x_difs = [la.norm(x - x_true)]
 
         # First descent step (gradient descent step) ===========================
         r = self.b - np.dot(self.A, x)
@@ -375,6 +374,8 @@ class ConjugateGradientsSolver:
         Ad = np.dot(self.A, d)
         a = rTr / np.dot(d.T, Ad)
         x += a * d
+        if x_true is not None:
+            x_difs.append(la.norm(x - x_true))
         # ======================================================================
 
         while i < max_iter:
@@ -403,6 +404,8 @@ class ConjugateGradientsSolver:
             a = rTr / np.dot(d.T, Ad)
 
             x += a * d
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
 
         if x_true is None:
             return x, i, residuals
@@ -411,7 +414,41 @@ class ConjugateGradientsSolver:
 
 
     def __cg_bare(self, tol, x, max_iter, recalc):
-        pass
+
+        # First descent step (GD) ==============================================
+        r = self.b - np.dot(self.A, x)
+        # Check if close enough already
+        if la.norm(r) <= tol:
+            return x
+
+        # If not, take a step
+        rTr = np.dot(r.T, r)
+        d = np.copy(r)
+        Ad = np.dot(self.A, d)
+        a = rTr / np.dot(d.T, Ad)
+        x += a * d
+
+        for i in range(1, max_iter):
+            if (i % recalc) == 0:
+                new_r = self.b - np.dot(self.A, x)
+            else:
+                new_r = r - (a * Ad)
+
+            if la.norm(new_r) <= tol:
+                break
+
+            new_rTr = np.dot(new_r.T, new_r)
+            beta = new_rTr / rTr
+
+            d = new_r + beta * d
+            r, rTr = new_r, new_rTr
+            Ad = np.dot(self.A, d)
+
+            a = rTr / np.dot(d.T, Ad)
+
+            x += a * d
+
+        return x
 
     def path(self, tol, x, max_iter, recalc):
         pass
