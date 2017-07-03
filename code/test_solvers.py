@@ -17,9 +17,19 @@ from collections import OrderedDict
 ## =================== PLOTTING PARAMS =================== ##
 #    p_xax:  (bool):  x-axis option
 #                       0: iteration, 1: time
+#   p_comp:  (bool):  compare plots
+#                       0: plot separately, 1: hold plots
 ## ==================== EXPORT PARAMS ==================== ##
 #   e_name:   (str):  export directory name
 #                       mkdir `e_name` under test_results
+## ===================== EXAMPLE SIM ===================== ##
+# t = Tester()
+# t.fit(n_sims=3, cond_num=25, m=10, n=10, p_xax=0, p_comp=0)
+# t.gen_data()
+# s1 = "GradientDescentSolver"
+# s2 = "ConjugateGradientsSolver"
+# t.test_spsd(s1)
+# t.test_spsd(s2)
 ## ======================================================= ##
 
 class Tester:
@@ -58,14 +68,14 @@ class Tester:
     def __repr__(self):
         return self.__str__()
 
-    def fit(self, n_sims, cond_num, m, n, p_xax):
+    def fit(self, n_sims, cond_num, m, n, p_xax, p_comp):
         """
         Fit for random simulations
         """
         self.n_sims, self.cond_num, self.m, self.n = n_sims, cond_num, m, n
         self.A, self.b, self.x_0, self.x_true = None, None, None, None
         
-        self.p_xax = p_xax
+        self.p_xax, self.p_comp = p_xax, p_comp
 
         fit_time = datetime.datetime.fromtimestamp( time.time() ).strftime('%Y-%m-%d_%H.%M.%S')
         self.e_name = "%s_%sx%s_%s" % (self.cond_num, self.m, self.n, fit_time)
@@ -105,7 +115,7 @@ class Tester:
         ## simulations
         for sim in range(self.n_sims):
             ## tracking
-            print("==================== Simulation: %s ====================\n" % sim)
+            print("==================== %s Simulation: %s ====================\n" % (solver_name, sim))
             ## error checking
             if self.A is None or self.b is None or self.x_0 is None or self.x_true is None:
                 raise AttributeError('data (A, b, x_0, x_true) haven\'t been generated yet.')
@@ -172,14 +182,11 @@ class Tester:
         plt.title('%s Simulation Results' % (solver_name))
         ax_errors.legend()
         fig_errors.savefig(path_out+'/errors.png')
-
-t = Tester()
-t.fit(n_sims=3, cond_num=25, m=10, n=10, p_xax=1)
-t.gen_data()
-s = "GradientDescentSolver"
-t.test_spsd(s)
-
-
+        if self.p_comp == 0:
+            fig_residuals.clf()
+            ax_residuals.cla()
+            fig_errors.clf()
+            ax_errors.cla()
 
 
 
