@@ -94,17 +94,26 @@ def plot_iter_refine(cond_num=1000, m=100, n=100):
     true_x = 4 * np.random.randn(n)
     b = np.dot(A, true_x)
 
+    irs = optimize.IterativeRefinementSolver(A=A, b=b, full_output=True)
+
     x = np.zeros(n)
     print('Initial residual norm: %f' % norm_dif(x, A, b))
 
     xopt, n_iter, suc, resids = optimize.iter_refinement_eps(A, b, full_output=True)
-    print('Opt resid norm: %f (%d iter)' % (norm_dif(xopt, A, b), n_iter))
+    print('Method error: %f (%d iter)' % (norm_dif(xopt, A, b), n_iter))
+
+    xopt, n_iter, c_resids = irs.solve()
+    print('Class error: %f (%d iter)' % (norm_dif(xopt, A, b), n_iter))
 
     plt.plot(resids.keys(), resids.values(), marker='o')
+    #plt.plot([i for i in range(len(resids))], resids.values(), marker='o')             # VERSUS ITER NUMBER
+    #plt.plot([i for i in range(len(c_resids))], [i[0] for i in c_resids], marker='o')  #   " "
+    plt.plot([i[1] for i in c_resids], [i[0] for i in c_resids], marker='o')
     plt.yscale('log')
     plt.ylabel('Residual ||Ax - b||')
     plt.xlabel('Time')
     plt.title('dim(A): %d x %d  cond(A): %d' % (m, n, cond_num))
+    plt.legend(['Method', 'Class'])
     plt.show()
 
     return resids

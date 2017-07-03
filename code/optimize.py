@@ -27,7 +27,10 @@ class Solver:
         if len(self.A) != len(self.b):
             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
 
-    def solve(self, tol=10**-5, x0 = None, max_iter = 500, recalc = 20, x_true = None):
+    def solve(self, tol=10**-5, x0 = None, max_iter = 500, x_true = None, **kwargs):
+        """
+        kwargs: solver-specific parameters (i.e. recalc for GD, CG; epsilon for IR)
+        """
         self._check_ready()
         if x0 is None:
             x = np.zeros(len(self.A))
@@ -35,9 +38,9 @@ class Solver:
             x = np.copy(x0)
 
         if self.full_output:
-            return self._full(tol, x, max_iter, recalc, x_true)
+            return self._full(tol, x, max_iter, x_true, **kwargs)
         else:
-            return self._bare(tol, x, max_iter, recalc)
+            return self._bare(tol, x, max_iter, **kwargs)
 
     def _full(*args, **kwargs):
         print('Not implemented?')
@@ -49,9 +52,9 @@ class Solver:
         """
         Make sure _full, _bare and path give roughly the same x.
         """
-        x_full = self._full(tol=10**-5, x=np.zeros(len(self.A)), max_iter=500, recalc=20, x_true=None)[0]
-        x_bare = self._bare(tol=10**-5, x=np.zeros(len(self.A)), max_iter=500, recalc=20)
-        x_path = self.path(tol=10**-5, x0=np.zeros(len(self.A)), max_iter=500, recalc=20)[-1]
+        x_full = self._full(tol=10**-5, x=np.zeros(len(self.A)), max_iter=500, x_true=None)[0]
+        x_bare = self._bare(tol=10**-5, x=np.zeros(len(self.A)), max_iter=500)
+        x_path = self.path(tol=10**-5, x0=np.zeros(len(self.A)), max_iter=500)[-1]
 
         print('Full-bare: %f' % la.norm(x_full - x_bare))
         print('Full-path: %f' % la.norm(x_full - x_path))
@@ -97,50 +100,18 @@ class GradientDescentSolver(Solver):
     def __repr__(self):
         return self.__str__()
 
-    # DEPRECATED
-    def gradient_descent(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
-        """
-        For SYMMETRIC, POSITIVE-DEFINITE matrices only.
-
-        If full_output=True and x_true is provided, this returns:
-            xopt:       optimal x (in numpy array)
-            n_iter:     number of iterations performed
-            resids:     for each iteration, its corresponding time and residual
-                            (in a list of tuples)
-            x_difs:     || x - x_true || at each iteration
-
-        If full_output=True and x_true is not provided:
-            xopt, n_iter, resids
-
-        If full_output=False:
-            xopt
-
-        TODO: is slightly less accurate than gd_alt and gd_nonsymm
-                (but much faster than them, so maybe doesn't matter)
-        """
-        # ======================================================================
-        if self.A is None or self.b is None:
-            raise AttributeError('A and/or b haven\'t been set yet.')
-
-        assert len(self.A) == len(self.A.T) == len(self.b)
-        if x0 is None:
-            x = np.zeros(len(self.A))
-        else:
-            x = np.copy(x0)
-        # ======================================================================
-
-        if self.full_output:
-            return self.__gd_full(tol=tol, x=x, max_iter=max_iter, recalc=recalc, x_true=x_true)
-        else:
-            return self.__gd_bare(tol=tol, x=x, max_iter=max_iter, recalc=recalc)
-
-    def _full(self, tol, x, max_iter, recalc, x_true):
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
         """
         Tracks everything (times/iteration, residuals, etc.).
 
         If you provide an x_true, it also tracks ||x - x_true|| at each
             iteration.
         """
+        if 'recalc' not in kwargs:
+            recalc = 20
+        else:
+            recalc = int(kwargs['recalc'])
+
         start_time = time.time()
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
@@ -192,10 +163,15 @@ class GradientDescentSolver(Solver):
         else:
             return x, i, residuals, x_difs
 
-    def _bare(self, tol, x, max_iter, recalc):
+    def _bare(self, tol, x, max_iter, **kwargs):
         """
         For max performance.
         """
+        if 'recalc' not in kwargs:
+            recalc = 20
+        else:
+            recalc = int(kwargs['recalc'])
+
         # First descent step ==========================================
         r = self.b - np.dot(self.A, x)
         # Check if close enough already
@@ -225,10 +201,14 @@ class GradientDescentSolver(Solver):
 
         return x
 
-    def path(self, tol = 10**-5, x0 = None, max_iter=500, recalc=20):
+    def path(self, tol = 10**-5, x0 = None, max_iter=500, **kwargs):
         """
         Returns list of points traversed during descent.
         """
+        if 'recalc' not in kwargs:
+            recalc = 20
+        else:
+            recalc = int(kwargs['recalc'])
         # ======================================================================
         if self.A is None or self.b is None:
             raise AttributeError('A and/or b haven\'t been set yet.')
@@ -312,40 +292,13 @@ class ConjugateGradientsSolver(Solver):
     def __repr__(self):
         return self.__str__()
 
-    # DEPRECATED
-    def conjugate_gradients(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
-        """
-        For SYMMETRIC, POSITIVE-DEFINITE matrices only.
-
-        If full_output=True and x_true is provided, this returns:
-            xopt:       optimal x (in numpy array)
-            n_iter:     number of iterations performed
-            resids:     for each iteration, its corresponding time and residual
-                            (in a list of tuples)
-            x_difs:     || x - x_true || at each iteration
-
-        If full_output=True and x_true is not provided:
-            xopt, n_iter, resids
-
-        If full_output=False:
-            xopt
-        """
-        #print('FOR SYMMETRIC, POSITIVE-DEFINITE MATRICES!')
-        if self.A is None or self.b is None:
-            raise AttributeError('A and/or b haven\'t been set yet.')
-
-        assert len(self.A) == len(self.A.T) == len(self.b)
-        if x0 is None:
-            x = np.zeros(len(self.A))
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
+        if 'recalc' not in kwargs:
+            recalc = 20
         else:
-            x = np.copy(x0)
+            recalc = int(kwargs['recalc'])
 
-        if self.full_output:
-            return self.__cg_full(tol, x, max_iter, recalc, x_true)
-        else:
-            return self.__cg_full(tol, x, max_iter, recalc)
 
-    def _full(self, tol, x, max_iter, recalc, x_true):
         start_time = time.time()
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
@@ -407,7 +360,12 @@ class ConjugateGradientsSolver(Solver):
         else:
             return x, i, residuals, x_difs
 
-    def _bare(self, tol, x, max_iter, recalc):
+    def _bare(self, tol, x, max_iter, **kwargs):
+        if 'recalc' not in kwargs:
+            recalc = 20
+        else:
+            recalc = int(kwargs['recalc'])
+
         # First descent step (GD) ==============================================
         r = self.b - np.dot(self.A, x)
         # Check if close enough already
@@ -443,13 +401,18 @@ class ConjugateGradientsSolver(Solver):
 
         return x
 
-    def path(self, tol = 10**-5, x0=None, max_iter = 500, recalc = 20):
+    def path(self, tol = 10**-5, x0=None, max_iter = 500, **kwargs):
+        if 'recalc' not in kwargs:
+            recalc = 20
+        else:
+            recalc = int(kwargs['recalc'])
+
         self._check_ready()
         if x0 is None:
             x = np.zeros(len(self.A))
         else:
             x = np.copy(x0)
-
+        # ======================================================================
         path = [x]
         # First descent step (GD) ==============================================
         r = self.b - np.dot(self.A, x)
@@ -488,145 +451,63 @@ class ConjugateGradientsSolver(Solver):
 
         return path
 
-# for symmetric, positive-definite A
-def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
-    """
-    For SYMMETRIC, POSITIVE-DEFINITE matrices.
-    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf (p. 32)
+class IterativeRefinementSolver(Solver):
 
-    Tested on a handful of small (~50x50 - 500x500 matrices) w/ various
-    condition numbers. Behaviour is as expected - systems with higher
-    condition numbers take longer to solve accurately.
+    def __str__(self):
+        l1 = 'Iterative Refinement Solver\n'
+        if self.A is None:
+            l2 = 'A: None; '
+        else:
+            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+        if self.b is None:
+            l2 += 'b: None\n'
+        else:
+            l2 += 'b: %d x %d\n' % (len(self.b), len(self.b.T))
+        if self.full_output:
+            l3 = 'full_output: True'
+        else:
+            l3 = 'full_output: False'
+        return l1+l2+l3
 
-    TODO: fix residual error accumulation
+    def __repr__(self):
+        return self.__str__()
 
-    Returns:
-        If not full_output: just the optimal x.
-        If full_output: optimal x, num iterations taken, success, residuals plot.
-    """
-    #tol *= la.norm(A)
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
+        if 'eps' not in kwargs:
+            eps = 2 * la.norm(self.A)
+        else:
+            eps = float(kwargs['eps'])
 
-    m, n = len(A), len(A.T)
-
-    if x is None:
-        x = np.zeros(n)
-
-    # d: first search direction (same as initial residual)
-    d = b - np.dot(A, x) # d(0) = r(0) = b - Ax(0)
-    r = d                # from eq. (45)
-
-    if full_output:
-        resids = OrderedDict()
         start_time = time.time()
-
-    for i in range(numIter):
-        if full_output:
-            resids[time.time() - start_time] = norm_dif(x, A, b)
-
-        # TODO: recalculate residual here every _ iters to avoid accumulating error
-        # if 0:
-        #     print(('r(%d): ' + str(r)) % i)
-        #     recalc_r = b - np.dot(A, x)
-        #     print('recalc: ' + str(recalc_r))
-        #     print('resid dif: %f' % la.norm(r - recalc_r))
+        residuals = []
+        if x_true is not None:
+            x_difs = [la.norm(x - x_true)]
 
 
-        a = np.dot(r.T, r) / np.dot(d.T, np.dot(A, d)) # eq. (46)
+        i = 0
+        while i < max_iter:
 
-        x += a * d
+            r = self.b - np.dot(self.A, x)
+            r_norm = la.norm(r)
+            residuals.append((r_norm, time.time() - start_time))
 
-        new_r = r - (a * np.dot(A, d)) # calculate new residual (A-orthogonal to
-                                       # previous except d)      (eq. 47)
+            if r_norm <= tol:
+                break
+            i += 1
 
-        beta = np.dot(new_r.T, new_r) / np.dot(r.T, r) # eq. (48)
+            eps *= 0.5
+            A_e = np.copy(self.A) + eps * np.identity(len(self.A))
 
-        d = new_r + beta * d
-        r = new_r
 
-        if la.norm(b - np.dot(A, x)) < tol:
-            if full_output:
-                resids[time.time() - start_time] = norm_dif(x, A, b)
-                return x, i, True, resids
-            else:
-                return x
+            x += np.dot(la.inv(A_e), r)
 
-    if full_output:
-        resids[time.time() - start_time] = norm_dif(x, A, b)
-        return x, numIter, False, resids
-    else:
-        return x
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
 
-def conjugate_gradient_psd(A,b,x_0=None,x_tru=None,tol=10**-3,max_iter=500,recalc=50,full_output=False):
-    """
-    CG for symmetric, psd A with 1 matrix-vector multiplication per iteration
-    """
-    n = len(A)
-    if x_0 is None:
-        x_0 = np.random.randn(n)
-
-    x = np.copy(x_0)
-    i = 0
-    r = b-np.dot(A,x)
-    d = np.copy(r)
-    del_new = np.dot(r,r)
-    del_0 = np.copy(del_new)
-
-    if full_output == True:
-        resids = OrderedDict()
-        start_time = time.time()
-        resids[i] = la.norm(b-np.dot(A,x))
-        if x_tru is not None:
-            errs = OrderedDict()
-            errs[i] = la.norm(x-x_tru)
-
-    while not (i > max_iter or del_new < (tol**2)*del_0):
-
-        q = np.dot(A,d)
-        alpha = del_new / np.dot(d,q)
-        x += alpha*d
-        if i % recalc == 0:
-            r = b-np.dot(A,x)
+        if x_true is None:
+            return x, i, residuals
         else:
-            r -= alpha*q
-
-        ## updates
-        del_old = np.copy(del_new)
-        del_new = np.dot(r,r)
-        beta = del_new / del_old
-        d = r + beta*d
-        i += 1
-
-        if full_output == True:
-            resids[i] = la.norm(b-np.dot(A,x))
-            if x_tru is not None:
-                errs[i] = la.norm(x-x_tru)
-
-    if full_output == True:
-        resids[i] = la.norm(b-np.dot(A,x))
-        if i < max_iter:
-            status = True
-        else:
-            status = False
-        if x_tru is not None:
-            errs[i] = la.norm(x-x_tru)
-            return x, i, status, resids, errs
-        else:
-            return x, i, status, resids
-    else:
-        return x
-
-# for any A
-def conjugate_gradient(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
-    """
-    Conjugate gradients on the normal equations.
-    (Page 41 in "Painless Conjugate Gradient")
-
-    A doesn't need to be symmetric, positive-definite, or even square.
-    Use conjugate_gradient_ideal for matrices that satisfy the above conditions.
-    """
-    return conjugate_gradient_ideal(A = np.dot(A.T, A), \
-                                    b = np.dot(A.T, b), x = x, \
-                                    numIter = numIter, full_output=full_output)
+            return x, i, residuals, x_difs
 
 # TO DO: BiCGStab
 
@@ -1271,3 +1152,143 @@ def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500,
         return x
 
 # ==============================================================================
+# CONJUGATE GRADIENT GRAVEYARD (?)
+# for symmetric, positive-definite A
+def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
+    """
+    For SYMMETRIC, POSITIVE-DEFINITE matrices.
+    https://www.cs.cmu.edu/~quake-papers/painless-conjugate-gradient.pdf (p. 32)
+
+    Tested on a handful of small (~50x50 - 500x500 matrices) w/ various
+    condition numbers. Behaviour is as expected - systems with higher
+    condition numbers take longer to solve accurately.
+
+    TODO: fix residual error accumulation
+
+    Returns:
+        If not full_output: just the optimal x.
+        If full_output: optimal x, num iterations taken, success, residuals plot.
+    """
+    #tol *= la.norm(A)
+
+    m, n = len(A), len(A.T)
+
+    if x is None:
+        x = np.zeros(n)
+
+    # d: first search direction (same as initial residual)
+    d = b - np.dot(A, x) # d(0) = r(0) = b - Ax(0)
+    r = d                # from eq. (45)
+
+    if full_output:
+        resids = OrderedDict()
+        start_time = time.time()
+
+    for i in range(numIter):
+        if full_output:
+            resids[time.time() - start_time] = norm_dif(x, A, b)
+
+        # TODO: recalculate residual here every _ iters to avoid accumulating error
+        # if 0:
+        #     print(('r(%d): ' + str(r)) % i)
+        #     recalc_r = b - np.dot(A, x)
+        #     print('recalc: ' + str(recalc_r))
+        #     print('resid dif: %f' % la.norm(r - recalc_r))
+
+
+        a = np.dot(r.T, r) / np.dot(d.T, np.dot(A, d)) # eq. (46)
+
+        x += a * d
+
+        new_r = r - (a * np.dot(A, d)) # calculate new residual (A-orthogonal to
+                                       # previous except d)      (eq. 47)
+
+        beta = np.dot(new_r.T, new_r) / np.dot(r.T, r) # eq. (48)
+
+        d = new_r + beta * d
+        r = new_r
+
+        if la.norm(b - np.dot(A, x)) < tol:
+            if full_output:
+                resids[time.time() - start_time] = norm_dif(x, A, b)
+                return x, i, True, resids
+            else:
+                return x
+
+    if full_output:
+        resids[time.time() - start_time] = norm_dif(x, A, b)
+        return x, numIter, False, resids
+    else:
+        return x
+
+def conjugate_gradient_psd(A,b,x_0=None,x_tru=None,tol=10**-3,max_iter=500,recalc=50,full_output=False):
+    """
+    CG for symmetric, psd A with 1 matrix-vector multiplication per iteration
+    """
+    n = len(A)
+    if x_0 is None:
+        x_0 = np.random.randn(n)
+
+    x = np.copy(x_0)
+    i = 0
+    r = b-np.dot(A,x)
+    d = np.copy(r)
+    del_new = np.dot(r,r)
+    del_0 = np.copy(del_new)
+
+    if full_output == True:
+        resids = OrderedDict()
+        start_time = time.time()
+        resids[i] = la.norm(b-np.dot(A,x))
+        if x_tru is not None:
+            errs = OrderedDict()
+            errs[i] = la.norm(x-x_tru)
+
+    while not (i > max_iter or del_new < (tol**2)*del_0):
+
+        q = np.dot(A,d)
+        alpha = del_new / np.dot(d,q)
+        x += alpha*d
+        if i % recalc == 0:
+            r = b-np.dot(A,x)
+        else:
+            r -= alpha*q
+
+        ## updates
+        del_old = np.copy(del_new)
+        del_new = np.dot(r,r)
+        beta = del_new / del_old
+        d = r + beta*d
+        i += 1
+
+        if full_output == True:
+            resids[i] = la.norm(b-np.dot(A,x))
+            if x_tru is not None:
+                errs[i] = la.norm(x-x_tru)
+
+    if full_output == True:
+        resids[i] = la.norm(b-np.dot(A,x))
+        if i < max_iter:
+            status = True
+        else:
+            status = False
+        if x_tru is not None:
+            errs[i] = la.norm(x-x_tru)
+            return x, i, status, resids, errs
+        else:
+            return x, i, status, resids
+    else:
+        return x
+
+# for any A
+def conjugate_gradient(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
+    """
+    Conjugate gradients on the normal equations.
+    (Page 41 in "Painless Conjugate Gradient")
+
+    A doesn't need to be symmetric, positive-definite, or even square.
+    Use conjugate_gradient_ideal for matrices that satisfy the above conditions.
+    """
+    return conjugate_gradient_ideal(A = np.dot(A.T, A), \
+                                    b = np.dot(A.T, b), x = x, \
+                                    numIter = numIter, full_output=full_output)
