@@ -1,11 +1,191 @@
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
-import time, sys, util, optimize, os
+import sys, os
+import time, datetime
+import util, optimize
 from scipy import optimize as scopt
 from scipy.sparse import linalg as scla
 from collections import OrderedDict
 
+## ================== SIMULATION PARAMS ================== ##
+#   n_sims:   (int):  number of simulations
+# cond_num:   (int):  condition number
+#        m:   (int):  rows of `A`
+#        n:   (int):  cols of `A`
+#        A:  (list):  *option* for particular `A`
+#                       or list of `A` matrices
+#        b:  (list):  *option* for particular `b`
+#                       or list of `b` vectors
+#      x_0:  (list):  *option* for particular `x_0`
+#                       or list of `x_0` vectors
+#   x_true:  (list):  *option* for particular `x_true`
+#                       or list of `x_true` vectors
+#   solver:   (str):  which solver type to run sims
+## =================== PLOTTING PARAMS =================== ##
+#   p_type:   (int):  plot type
+#                       0: resids, 1: errs, 2: both
+# 
+#    p_xax:  (bool):  x-axis option
+#                       0: iteration, 1: time
+## ==================== EXPORT PARAMS ==================== ##
+#   e_name:   (str):  export directory name
+#                       mkdir `e_name` under test_results
+## ======================================================= ##
+
+class Tester:
+    def __init__(self, \
+                 n_sims=None, cond_num=None, m=None, n=None, x_0=None, x_true = None, solver=None, \
+                 p_type=None, p_xax=None, \
+                 e_name=None \
+                ):
+        
+        self.n_sims, self.cond_num, self.m, self.n = n_sims, cond_num, m, n
+        # self.A = A, self.b = b
+        self.x_0, self.x_true = x_0, x_true
+        self.solver = solver
+
+        self.p_type, self.p_xax = p_type, p_xax
+
+        self.e_name = e_name
+
+    def __str__(self):
+        l1 = 'Tester for %s Solver\n' % self.solver
+        
+        if self.n_sims is None: l2 = 'n_sims: None;\n'
+        else: l2 = 'n_sims: %d;\n' % self.n_sims
+        
+        if self.cond_num is None: l3 = 'cond_num: None;\n'
+        else: l3 = 'cond_num: %d;\n' % self.cond_num
+        
+        if self.m is None: l4 = 'm: None;\n'
+        else: l4 = 'm: %d;\n' % self.m
+        
+        if self.n is None: l5 = 'n: None;\n'
+        else: l5 = 'n: %d;\n' % self.n
+        
+        # # if self.A is None: l6 = 'A: None\n'
+        # else: l6 += 'A: %d-list of %d x %d\n static matrices' % (len(A), len(self.A[0]), len(self.A[0].T))
+        
+        # # if self.b is None: l7 = 'b: None\n'
+        # else: l7 = 'b: %d-list of %d x %d\n static vectors' % (len(b), len(self.b[0]), len(self.b[0].T))
+
+        if self.p_type is None: l6 = 'p_type: None\n'
+        else: l6 = 'p_type: %s\n' % p_type
+
+        if self.p_xax is None: l7 = 'p_xax: None\n'
+        else: l7 = 'p_xax: %s\n' % p_xax
+        
+        # return l1+l2+l3+l4+l5+l6+l7
+        return l1+l2+l3+l4+l5+l6+l7
+
+    def __repr__(self):
+        return self.__str__()
+
+    def fit(self, n_sims, cond_num, m, n, p_type, p_xax):
+        """
+        Fit for random simulations
+        """
+        self.n_sims = n_sims
+        self.cond_num = cond_num
+        self.m = m
+        self.n = n
+        # self.A = A
+        # self.b = b
+
+        self.p_type = p_type
+        self.p_xax = p_xax
+
+        fit_time = datetime.datetime.fromtimestamp( time.time() ).strftime('%Y-%m-%d_%H.%M.%S')
+        self.e_name = "rand_%s_%sx%s_%s" % (self.cond_num, self.m, self.n, fit_time)
+
+    # def gen_data()
+
+    def test_spsd(self,solver):
+        """
+        Test symmetric, psd matrices 
+        """
+        ## error checking
+        if self.n_sims is None or self.cond_num is None or (self.m is None and self.n is None):
+            raise AttributeError('n_sims and/or cond_num and/or (m and n) haven\'t been set yet.')
+        assert self.m == self.n
+        solver_name = solver
+        self.solver = eval("optimize."+solver_name)
+
+        ## initialize output objects
+        x_opt_out = []
+        i_out = []
+        residuals_out = []
+        if self.x_true is not None: errors_out = []
+        path_out = []
+
+        ## initialize plots
+        fig = plt.figure()
+        ax = plt.subplot()
+
+        ## simulations
+        for sim in range(self.n_sims):
+            ## tracking
+            print("==================== Simulation: %s ====================" % sim)
+
+            ## formulate problem instance
+            A = util.psd_from_cond(self.cond_num,self.n)
+            x_true = np.random.randn(self.n)
+            x_0 = np.random.randn(self.n)
+            b = np.dot(A,x_true)
+            
+            ## instantiate solver object
+            solver_object = self.solver(A=A,b=b,full_output=True)
+            
+            ## solve simulated problem
+            if self.x_true: 
+                x_opt, i, residuals, errors = solver_object.solve(tol=10**-5, x0=x_0, max_iter=500, recalc=20, x_true=x_true)
+            else: 
+                x_opt, i, residuals= solver_object.solve()
+            path = solver_object.path(self, x0=self.x_0, max_iter=500, recalc=20)
+            
+            ## append output
+            x_opt_out.append(x_opt)
+            i_out.append(i)
+            residuals_out.append(residuals)
+            if self.x_true:
+                errors_out.append(errors)
+            path_out.append(path)
+
+            ## initialize x,y vectors for plot
+            residuals_indiv = [x[0] for x in residuals]
+            ylab = "Residual ||Ax - b||"
+            if self.p_xax == 0: 
+                xax = range(len(residuals))
+                xlab = "Iteration"
+            else: 
+                xax = [x[1] for x in residuals]
+                xlab = "Time"
+            
+            ## add to plot
+            ax.plot(xax, residuals_indiv, label='sim-%s resids' % sim)
+            plt.yscale('log')
+            plt.xlabel(xlab)
+            plt.ylabel(ylab)
+
+        ## save plot 
+        out_name = "../test_results/"+str(solver_name)+"/"+self.e_name
+        if not os.path.exists(out_name):
+            os.makedirs(out_name)
+        plt.title('%s Simulation Results' % (solver_name))
+        ax.legend()
+        plt.show()
+        fig.savefig(out_name+'/resids.png')
+
+t = Tester()
+t.fit(n_sims=3, cond_num=25, m=10, n=10, p_type=0, p_xax=0)
+s = "GradientDescentSolver"
+t.test_spsd(s)
+
+
+
+
+# ==================== GRAVEYARD ==================== #
 
 def norm_dif(x, *args):
     """
