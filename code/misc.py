@@ -153,7 +153,7 @@ def compare_cg(plot=True):
 
         st_time = time.time()
         cgs.A, cgs.b = A, b
-        xopt, n_iter, cl_resids = cgs.conjugate_gradients()
+        xopt, n_iter, cl_resids = cgs.solve()
         #cl_t, cl_r = [i[1] for i in cl_resids], [i[0] for i in cl_resids]
         cl_err = norm_dif(xopt, A, b)
         cl_avg_err += cl_err

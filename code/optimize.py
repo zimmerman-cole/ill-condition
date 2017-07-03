@@ -69,9 +69,6 @@ class GradientDescentSolver(Solver):
     """
     Gradient descent solver.
 
-    All arguments for constructor (A, b, full_output) are optional.
-        full_output defaults to False.
-
     Methods:
         gd.gradient_descent(tol, x0, max_iter, recalc, x_true):
             All arguments are optional, but A and b must have been set before
@@ -100,6 +97,7 @@ class GradientDescentSolver(Solver):
     def __repr__(self):
         return self.__str__()
 
+    # DEPRECATED
     def gradient_descent(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
         """
         For SYMMETRIC, POSITIVE-DEFINITE matrices only.
@@ -274,12 +272,9 @@ class GradientDescentSolver(Solver):
 
         return path
 
-class ConjugateGradientsSolver:
+class ConjugateGradientsSolver(Solver):
     """
     Conjugate gradients solver.
-
-    All arguments for constructor (A, b, full_output) are optional.
-        full_output defaults to False.
 
     Methods:
         cg.fit(A, b):
@@ -293,10 +288,10 @@ class ConjugateGradientsSolver:
             Returns list of points traversed during descent (for visualization).
     """
 
-    def __init__(self, A=None, b=None, full_output=False):
-        self.A = A
-        self.b = b
-        self.full_output = full_output
+    # def __init__(self, A=None, b=None, full_output=False):
+    #     self.A = A
+    #     self.b = b
+    #     self.full_output = full_output
 
     def __str__(self):
         l1 = 'Conjugate Gradients Solver\n'
@@ -317,6 +312,7 @@ class ConjugateGradientsSolver:
     def __repr__(self):
         return self.__str__()
 
+    # DEPRECATED
     def conjugate_gradients(self, tol=10**-5, x0 = None, max_iter = 500, recalc=20, x_true=None):
         """
         For SYMMETRIC, POSITIVE-DEFINITE matrices only.
@@ -334,7 +330,7 @@ class ConjugateGradientsSolver:
         If full_output=False:
             xopt
         """
-        print('FOR SYMMETRIC, POSITIVE-DEFINITE MATRICES!')
+        #print('FOR SYMMETRIC, POSITIVE-DEFINITE MATRICES!')
         if self.A is None or self.b is None:
             raise AttributeError('A and/or b haven\'t been set yet.')
 
@@ -349,8 +345,7 @@ class ConjugateGradientsSolver:
         else:
             return self.__cg_full(tol, x, max_iter, recalc)
 
-
-    def __cg_full(self, tol, x, max_iter, recalc, x_true):
+    def _full(self, tol, x, max_iter, recalc, x_true):
         start_time = time.time()
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
@@ -412,9 +407,7 @@ class ConjugateGradientsSolver:
         else:
             return x, i, residuals, x_difs
 
-
-    def __cg_bare(self, tol, x, max_iter, recalc):
-
+    def _bare(self, tol, x, max_iter, recalc):
         # First descent step (GD) ==============================================
         r = self.b - np.dot(self.A, x)
         # Check if close enough already
@@ -450,8 +443,50 @@ class ConjugateGradientsSolver:
 
         return x
 
-    def path(self, tol, x, max_iter, recalc):
-        pass
+    def path(self, tol = 10**-5, x0=None, max_iter = 500, recalc = 20):
+        self._check_ready()
+        if x0 is None:
+            x = np.zeros(len(self.A))
+        else:
+            x = np.copy(x0)
+
+        path = [x]
+        # First descent step (GD) ==============================================
+        r = self.b - np.dot(self.A, x)
+        # Check if close enough already
+        if la.norm(r) <= tol:
+            return path
+
+        # If not, take a step
+        rTr = np.dot(r.T, r)
+        d = np.copy(r)
+        Ad = np.dot(self.A, d)
+        a = rTr / np.dot(d.T, Ad)
+        x += a * d
+        path.append(x)
+
+        for i in range(1, max_iter):
+            if (i % recalc) == 0:
+                new_r = self.b - np.dot(self.A, x)
+            else:
+                new_r = r - (a * Ad)
+
+            if la.norm(new_r) <= tol:
+                break
+
+            new_rTr = np.dot(new_r.T, new_r)
+            beta = new_rTr / rTr
+
+            d = new_r + beta * d
+            r, rTr = new_r, new_rTr
+            Ad = np.dot(self.A, d)
+
+            a = rTr / np.dot(d.T, Ad)
+
+            x += a * d
+            path.append(x)
+
+        return path
 
 # for symmetric, positive-definite A
 def conjugate_gradient_ideal(A, b, tol=0.001, x = None, numIter = 500, full_output=False):
