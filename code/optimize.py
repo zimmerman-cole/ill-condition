@@ -27,7 +27,8 @@ class Solver:
         if len(self.A) != len(self.b):
             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
 
-    def solve(self, tol=10**-5, x0 = None, max_iter = 500, x_true = None, **kwargs):
+
+    def solve(self, tol=10**-5, x_0 = None, max_iter = 500, x_true = None, **kwargs):
         """
         Solve the linear system Ax = b for x.
 
@@ -58,10 +59,10 @@ class Solver:
             If full_output=False, just x is returned.
         """
         self._check_ready()
-        if x0 is None:
-            x = np.zeros(len(self.A))
+        if x_0 is None:
+            x = np.random.randn(len(self.A))
         else:
-            x = np.copy(x0)
+            x = np.copy(x_0)
 
         if self.full_output:
             return self._full(tol, x, max_iter, x_true, **kwargs)
@@ -78,14 +79,14 @@ class Solver:
         """
         Make sure _full, _bare and path give roughly the same x.
         """
-        x_full = self._full(tol=10**-5, x=np.zeros(len(self.A)), max_iter=500, x_true=None)[0]
-        x_bare = self._bare(tol=10**-5, x=np.zeros(len(self.A)), max_iter=500)
-        x_path = self.path(tol=10**-5, x0=np.zeros(len(self.A)), max_iter=500)[-1]
+        x_0 = np.random.randn(len(self.A))
+        x_full = self._full(tol=10**-5, x=np.copy(x_0),   max_iter=500, recalc=20, x_true=None)[0]
+        x_bare = self._bare(tol=10**-5, x=np.copy(x_0),   max_iter=500, recalc=20)
+        x_path = self.path(tol=10**-5,  x_0=np.copy(x_0), max_iter=500, recalc=20)[-1]
 
         print('Full-bare: %f' % la.norm(x_full - x_bare))
         print('Full-path: %f' % la.norm(x_full - x_path))
         print('Bare-path: %f' % la.norm(x_bare - x_path))
-        #print(la.norm(np.dot(la.inv(self.A), self.b) - x_full))
 
 # || b - Ax ||
 def norm_dif(x, *args):
@@ -224,7 +225,7 @@ class GradientDescentSolver(Solver):
 
         return x
 
-    def path(self, tol = 10**-5, x0 = None, max_iter=500, **kwargs):
+    def path(self, tol = 10**-5, x_0 = None, max_iter=500, **kwargs):
         """
         Returns list of points traversed during descent.
         """
@@ -237,10 +238,10 @@ class GradientDescentSolver(Solver):
             raise AttributeError('A and/or b haven\'t been set yet.')
 
         assert len(self.A) == len(self.A.T) == len(self.b)
-        if x0 is None:
-            x = np.zeros(len(self.A))
+        if x_0 is None:
+            x = np.random.randn(len(self.A))
         else:
-            x = np.copy(x0)
+            x = np.copy(x_0)
         # ======================================================================
         path = [np.copy(x)]
 
@@ -303,12 +304,12 @@ class ConjugateGradientsSolver(Solver):
     def __repr__(self):
         return self.__str__()
 
+
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         if 'recalc' not in kwargs:
             recalc = 20
         else:
             recalc = int(kwargs['recalc'])
-
 
         start_time = time.time()
         if x_true is not None:
@@ -412,19 +413,20 @@ class ConjugateGradientsSolver(Solver):
 
         return x
 
-    def path(self, tol = 10**-5, x0=None, max_iter = 500, **kwargs):
+    def path(self, tol = 10**-5, x_0=None, max_iter = 500, **kwargs):
         if 'recalc' not in kwargs:
             recalc = 20
         else:
             recalc = int(kwargs['recalc'])
 
         self._check_ready()
-        if x0 is None:
+        if x_0 is None:
             x = np.zeros(len(self.A))
         else:
-            x = np.copy(x0)
+            x = np.copy(x_0)
         # ======================================================================
         path = [np.copy(x)]
+
         # First descent step (GD) ==============================================
         r = self.b - np.dot(self.A, x)
         # Check if close enough already
@@ -773,7 +775,7 @@ def test_arnoldi(A,b):
             print(np.dot(Q[:,i],Q[:,j]))
     print(H - np.dot(Q.T,np.dot(A,Q)))
 
-def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
+def jacobi(A,b,tol=0.001,maxiter=1000,x_0=None):
     '''
     Solves Ax = b with Jacobi splitting method
         A \in R^[n x n]
@@ -789,8 +791,8 @@ def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
     n = A.shape[0]
 
     ## start
-    if x0 == None:
-        x0 = np.random.randn(n)
+    if x_0 == None:
+        x_0 = np.random.randn(n)
 
     ## construct matrix components
     D = np.zeros([n,n])
@@ -811,7 +813,7 @@ def jacobi(A,b,tol=0.001,maxiter=1000,x0=None):
         print('Spectral radius of B: %f' % spec_rad)
 
     ## iterations
-    x = x0
+    x = x_0
     for i in range(maxiter):
         x = np.dot(B,x) + z
         #print(la.norm(np.dot(A,x)-b))
@@ -850,7 +852,7 @@ def iter_refinement(A, b, tol=0.001, numIter=500, x=None, full_output=False):
             resids[time.time() - start_time] = la.norm(r)
 
         # Solve the system (Ad = r) for d
-        result = scopt.minimize(fun=norm_dif, x0=np.random.randn(m), \
+        result = scopt.minimize(fun=norm_dif, x_0=np.random.randn(m), \
                                 args=(A, r), method='CG')
         d, success, msg = result.x, result.success, result.message
         # TODO: find out which method is best/quickest to solve this
@@ -1011,7 +1013,7 @@ def gradient_descent(A, b, tol=10**-5, x = None, numIter = 500, full_output=Fals
         return x
 
 # modification: 1 matrix-vector multiplication per iteration
-def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
+def gradient_descent_alt(A, b, x_0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
     """
     Implementation of gradient descent for PSD matrices.
 
@@ -1023,7 +1025,7 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
     Args:
         (numpy.ndarray)     A:    n x n transformation matrix.
         (numpy.ndarray)     b:    n x 1 "target values".
-        (numpy.ndarray)    x0:    n x 1 initial guess (optional).
+        (numpy.ndarray)    x_0:    n x 1 initial guess (optional).
         (numpy.ndarray) x_tru:    n x 1 true x (optional).
         (int)         numIter:    Number of passes over data.
 
@@ -1039,11 +1041,11 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
 
     # Working with (n, ) vectors, not (n, 1)
     if len(b.shape) == 2: b = b.reshape(n, )
-    if x0 is None:
-        x0 = np.random.randn(n, )
+    if x_0 is None:
+        x_0 = np.random.randn(n, )
     else:
-        assert len(x0) == n
-        if len(x0.shape) == 2: x0 = x0.reshape(n, ) # (n, ) over (n, 1)
+        assert len(x_0) == n
+        if len(x_0.shape) == 2: x_0 = x_0.reshape(n, ) # (n, ) over (n, 1)
 
     # diagnostics
     x_hist = []
@@ -1052,7 +1054,7 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
         resids = []
 
     # first descent step
-    x = x0
+    x = x_0
     r_curr = b - np.dot(A, x)
     Ar_curr = np.dot(A,r_curr)
     a = np.inner(r_curr.T, r_curr) / float(np.inner(r_curr.T, Ar_curr))
@@ -1111,7 +1113,7 @@ def gradient_descent_alt(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, rec
         return x
 
 # modifications: 1 matrix-vector multiplication per iteration; nonsymmetric (square) matrix A
-def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
+def gradient_descent_nonsymm(A, b, x_0=None, x_tru=None, tol=10**-5, numIter=500, recalc=50, full_output=False):
     """
     Implementation of gradient descent for nonsymmetric matrices (or symmetric, but slow in this case).
 
@@ -1124,7 +1126,7 @@ def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500,
     Args:
         (numpy.ndarray)     A:    n x n transformation matrix.
         (numpy.ndarray)     b:    n x 1 "target values".
-        (numpy.ndarray)    x0:    n x 1 initial guess (optional).
+        (numpy.ndarray)    x_0:    n x 1 initial guess (optional).
         (numpy.ndarray) x_tru:    n x 1 true x (optional).
         (int)         numIter:    Number of passes over data.
 
@@ -1140,11 +1142,11 @@ def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500,
 
     # Working with (n, ) vectors, not (n, 1)
     if len(b.shape) == 2: b = b.reshape(n, )
-    if x0 is None:
-        x0 = np.random.randn(n, )
+    if x_0 is None:
+        x_0 = np.random.randn(n, )
     else:
-        assert len(x0) == n
-        if len(x0.shape) == 2: x0 = x0.reshape(n, ) # (n, ) over (n, 1)
+        assert len(x_0) == n
+        if len(x_0.shape) == 2: x_0 = x_0.reshape(n, ) # (n, ) over (n, 1)
 
     # diagnostics
     x_hist = []
@@ -1153,7 +1155,7 @@ def gradient_descent_nonsymm(A, b, x0=None, x_tru=None, tol=10**-5, numIter=500,
         resids = []
 
     # first descent step
-    x = x0
+    x = x_0
     AA = 1/2*A+A.T
     r_curr = b - np.dot(AA, x)
     Ar_curr = np.dot(AA,r_curr)
