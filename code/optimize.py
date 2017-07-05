@@ -34,7 +34,7 @@ class Solver:
 
         Args:
             (number)         tol:   Desired degree of accuracy (||residual|| <= tol).
-            (np.array)        x0:   Initial guess for x.
+            (np.array)        x_0:   Initial guess for x.
             (int)       max_iter:   Maximum number of iterations.
             (np.array)    x_true:   True solution to system. If provided (and
                                       full_outFput=True), the solver tracks
@@ -542,7 +542,7 @@ class IterativeRefinementSolver(Solver):
 
         return x
 
-    def path(self, tol=10**-5, x0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
         if 'eps' not in kwargs:
             eps = 2 * la.norm(self.A)
         else:
@@ -551,10 +551,10 @@ class IterativeRefinementSolver(Solver):
 
 
         self._check_ready()
-        if x0 is None:
+        if x_0 is None:
             x = np.zeros(len(self.A))
         else:
-            x = np.copy(x0)
+            x = np.copy(x_0)
 
         path = [np.copy(x)]
 
