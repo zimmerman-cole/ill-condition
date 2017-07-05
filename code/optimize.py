@@ -11,9 +11,16 @@ class Solver:
     Parent class for linear solvers.
     """
 
-    def __init__(self, A=None, b=None, full_output=False):
+    def __init__(self, A=None, b=None, full_output=False, **kwargs):
+        ## data input/output parameters
         self.A, self.b = A, b
         self.full_output = full_output
+
+        ## intermediate solver parameters
+        if bool(kwargs) == True:
+            self.intermediate_solver = kwargs["intermediate_solver"]
+            self.intermediate_iter = kwargs["intermediate_iter"]
+            self.intermediate_continuation = kwargs["intermediate_continuation"]
 
     def _check_ready(self):
         """
@@ -87,6 +94,67 @@ class Solver:
         print('Full-bare: %f' % la.norm(x_full - x_bare))
         print('Full-path: %f' % la.norm(x_full - x_path))
         print('Bare-path: %f' % la.norm(x_bare - x_path))
+
+class DirectInverseSolver(Solver):
+
+    def __str__(self):
+        l1 = 'Direct Inverse Solver\n'
+        if self.A is None:
+            l2 = 'A: None; '
+        else:
+            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+        if self.b is None:
+            l2 += 'b: None\n'
+        else:
+            l2 += 'b: %d x %d\n' % (len(self.b), len(self.b.T))
+        if self.full_output:
+            l3 = 'full_output: True'
+        else:
+            l3 = 'full_output: False'
+        return l1+l2+l3
+
+    def __repr__(self):
+        return self.__str__()
+
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
+
+        ## initialize
+        i = 0
+        start_time = time.time()
+        residuals = []
+        if x_true is not None:
+            x_difs = [la.norm(x - x_true)]
+
+        ## residuals (0)
+        r = self.b - np.dot(self.A, x)
+        r_norm = la.norm(r)
+        residuals.append((r_norm, time.time() - start_time))
+
+        ## solve
+        x = la.solve(self.A,self.b)
+
+        ## residuals (1)
+        r = self.b - np.dot(self.A, x)
+        r_norm = la.norm(r)
+        residuals.append((r_norm, time.time() - start_time))
+
+        if x_true is not None:
+            x_difs.append(la.norm(x - x_true))
+
+        if x_true is None:
+            return x, i, residuals
+        else:
+            return x, i, residuals, x_difs
+
+    def _bare(self, tol, x, max_iter, **kwargs):
+        x = la.solve(self.A,self.b)
+        return x
+
+    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+        path = [x]
+        x = la.solve(self.A,self.b)
+        path.append(x)
+        return path
 
 # || b - Ax ||
 def norm_dif(x, *args):
@@ -572,6 +640,132 @@ class IterativeRefinementSolver(Solver):
 
 
         return path
+
+class IterativeRefinementGeneralSolver(Solver):
+
+    def __str__(self):
+        l1 = 'Iterative Refinement General Solver\n'
+        if self.A is None:
+            l2 = 'A: None; '
+        else:
+            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+        if self.b is None:
+            l2 += 'b: None\n'
+        else:
+            l2 += 'b: %d x %d\n' % (len(self.b), len(self.b.T))
+        if self.full_output:
+            l3 = 'full_output: True\n'
+        else:
+            l3 = 'full_output: False'
+        if self.intermediate_solver is None:
+            l4 = 'intermediate_solver: None\n'
+        else:
+            l4 = 'intermediate_solver: %s' % self.intermediate_solver
+        return l1+l2+l3+l4
+
+    def __repr__(self):
+        return self.__str__()
+
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
+        if 'eps' not in kwargs:
+            eps = 2 * la.norm(self.A)
+        else:
+            eps = float(kwargs['eps'])
+
+        start_time = time.time()
+        residuals = []
+        if x_true is not None:
+            x_difs = [la.norm(x - x_true)]
+
+        i = 0
+        while i < max_iter:
+
+            r = self.b - np.dot(self.A, x)
+            r_norm = la.norm(r)
+            residuals.append((r_norm, time.time() - start_time))
+
+            if r_norm <= tol:
+                break
+            i += 1
+
+            if self.intermediate_continuation == True:
+                eps *= 0.5
+            A_e = self.A + eps * np.identity(len(self.A))
+
+            ## call intermediate solver method
+            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
+            d_i, i_i, r_i, x_d_i = solver_object.solve(tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20, x_true=x_true)
+            # residuals.append((la.norm(r_i),time.time() - start_time))
+            # x_difs.append(la.norm(x_d_i))
+
+            ## update x
+            x += d_i
+
+            ## track
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
+
+        if x_true is None:
+            return x, i, residuals
+        else:
+            return x, i, residuals, x_difs
+
+    def _bare(self, tol, x, max_iter, **kwargs):
+        if 'eps' not in kwargs:
+            eps = 2 * la.norm(self.A)
+        else:
+            eps = float(kwargs['eps'])
+
+        for i in range(max_iter):
+            r = self.b - np.dot(self.A, x)
+
+            if la.norm(r) <= tol:
+                break
+
+            if self.intermediate_continuation == True:
+                eps *= 0.5
+            A_e = self.A + eps * np.identity(len(self.A))
+
+            ## call intermediate solver method
+            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
+            d_i, i, r_i, x_d_i = solver_object.solve(tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20, x_true=None)
+            x += d_i
+
+        return x
+
+    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+        if 'eps' not in kwargs:
+            eps = 2 * la.norm(self.A)
+        else:
+            eps = float(kwargs['eps'])
+
+        self._check_ready()
+        if x_0 is None:
+            x = np.zeros(len(self.A))
+        else:
+            x = np.copy(x_0)
+
+        path = [x]
+
+        for i in range(max_iter):
+            r = self.b - np.dot(self.A, x)
+
+            if la.norm(r) <= tol:
+                break
+
+            if self.intermediate_continuation == True:
+                eps *= 0.5
+            A_e = self.A + eps * np.identity(len(self.A))
+
+            ## call intermediate solver method
+            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
+            d_i, i, r_i = solver_object.solve(tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20,x_true=None)
+            x += d_i
+
+            path.append(x)
+
+        return x
+
 
 # TO DO: BiCGStab
 

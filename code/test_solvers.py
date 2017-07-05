@@ -38,7 +38,7 @@ class Tester:
                  p_xax=None, \
                  e_name=None \
                 ):
-        
+
         self.n_sims, self.cond_num, self.m, self.n, self.solver = n_sims, cond_num, m, n, solver
 
         self.p_xax = p_xax
@@ -47,22 +47,22 @@ class Tester:
 
     def __str__(self):
         l1 = 'Tester for %s Solver\n' % self.solver
-        
+
         if self.n_sims is None: l2 = 'n_sims: None;\n'
         else: l2 = 'n_sims: %d;\n' % self.n_sims
-        
+
         if self.cond_num is None: l3 = 'cond_num: None;\n'
         else: l3 = 'cond_num: %d;\n' % self.cond_num
-        
+
         if self.m is None: l4 = 'm: None;\n'
         else: l4 = 'm: %d;\n' % self.m
-        
+
         if self.n is None: l5 = 'n: None;\n'
         else: l5 = 'n: %d;\n' % self.n
-        
+
         if self.p_xax is None: l6 = 'p_xax: None\n'
         else: l6 = 'p_xax: %s\n' % p_xax
-        
+
         return l1+l2+l3+l4+l5+l6+l7
 
     def __repr__(self):
@@ -74,7 +74,7 @@ class Tester:
         """
         self.n_sims, self.cond_num, self.m, self.n = n_sims, cond_num, m, n
         self.A, self.b, self.x_0, self.x_true = None, None, None, None
-        
+
         self.p_xax, self.p_comp = p_xax, p_comp
 
         fit_time = datetime.datetime.fromtimestamp( time.time() ).strftime('%Y-%m-%d_%H.%M.%S')
@@ -88,9 +88,9 @@ class Tester:
             self.x_0.append( np.random.randn(self.n) )
             self.b.append( np.dot(self.A[sim],self.x_true[sim]) )
 
-    def test_spsd(self,solver):
+    def test_spsd(self,solver,**kwargs):
         """
-        Test symmetric, psd matrices 
+        Test symmetric, psd matrices
         """
         ## error checking
         if self.n_sims is None or self.cond_num is None or (self.m is None and self.n is None):
@@ -98,6 +98,14 @@ class Tester:
         assert self.m == self.n
         solver_name = solver
         self.solver = eval("optimize."+solver_name)
+
+        ## intermediate solver parameters
+        if bool(kwargs) == True:
+            intermediate_solver_name = kwargs["intermediate_solver"]
+
+            self.intermediate_solver = eval("optimize."+intermediate_solver_name)
+            self.intermediate_iter = kwargs["intermediate_iter"]
+            self.intermediate_continuation = kwargs["intermediate_continuation"]
 
         ## initialize output objects
         x_opt_out = []
@@ -111,7 +119,7 @@ class Tester:
         ax_residuals = plt.subplot(111)
         fig_errors = plt.figure("errors")
         ax_errors = plt.subplot(111)
-        
+
         ## simulations
         for sim in range(self.n_sims):
             ## tracking
@@ -125,14 +133,21 @@ class Tester:
             x_true = np.copy(self.x_true[sim])
             x_0 = np.copy(self.x_0[sim])
             b = np.copy(self.b[sim])
-            
+
             ## instantiate solver object
-            solver_object = self.solver(A=A, b=b, full_output=True)
-            
+            if bool(kwargs) == False:
+                solver_object = self.solver(A=A, b=b, full_output=True)
+            else:
+                solver_object = self.solver(A=A, b=b, full_output=True, \
+                                            intermediate_solver = self.intermediate_solver, \
+                                            intermediate_iter = self.intermediate_iter, \
+                                            intermediate_continuation = self.intermediate_continuation \
+                                            )
+
             ## solve simulated problem
             x_opt, i, residuals, errors = solver_object.solve(tol=10**-5, x_0=x_0, max_iter=500, recalc=20, x_true=x_true)
-            path = solver_object.path(self, x_0=x_0, max_iter=500, recalc=20)
-            
+            path = solver_object.path(self, x_0=x_0, max_iter=500, recalc=20,  x_true=x_true)
+
             ## append output
             x_opt_out.append(x_opt)
             i_out.append(i)
@@ -141,46 +156,52 @@ class Tester:
             path_out.append(path)
 
             ## set axes
-            if self.p_xax == 0: 
+            if self.p_xax == 0:
                 xax = range(len(residuals))
                 xlab = "Iteration"
-            else: 
+            else:
                 xax = [x[1] for x in residuals]
                 xlab = "Time"
 
-            ## y vectors 
+            ## y vectors
             y_residuals = [x[0] for x in residuals]  # residuals
             ylab_residuals = "Residual ||Ax - b||"   # residuals
-            y_errors = [x[0] for x in residuals]     # errors
+            y_errors = [x for x in errors]     # errors
             ylab_errors = "Error ||x - x_true||"     # errors
-            
+
             ## plot residuals
             plt.figure("residuals")
             ax_residuals.plot(xax, y_residuals, label='sim-%s resids' % sim)
             plt.yscale('log')
             plt.xlabel(xlab)
             plt.ylabel(ylab_residuals)
-            
+
             ## plot errors
             plt.figure("errors")
             ax_errors.plot(xax, y_errors, label='sim-%s errs' % sim)
             plt.yscale('log')
             plt.xlabel(xlab)
             plt.ylabel(ylab_errors)
-                
+
         ## save plot(s)
         path_out = "../test_results/"+str(solver_name)+"/"+self.e_name
         if not os.path.exists(path_out):
             os.makedirs(path_out)
 
         plt.figure("residuals")
-        plt.title('%s Simulation Results' % (solver_name))
-        ax_residuals.legend()
+        if bool(kwargs) == True:
+            plt.title('%s Simulation Results (Intermediate: %s )' % (solver_name, intermediate_solver_name))
+        else:
+            plt.title('%s Simulation Results' % (solver_name))
+        ax_residuals.legend(prop={'size':5})
         fig_residuals.savefig(path_out+'/residuals.png')
-        
+
         plt.figure("errors")
-        plt.title('%s Simulation Results' % (solver_name))
-        ax_errors.legend()
+        if bool(kwargs) == True:
+            plt.title('%s Simulation Results (Intermediate: %s )' % (solver_name, intermediate_solver_name))
+        else:
+            plt.title('%s Simulation Results' % (solver_name))
+        ax_errors.legend(prop={'size':5})
         fig_errors.savefig(path_out+'/errors.png')
         if self.p_comp == 0:
             fig_residuals.clf()
@@ -188,6 +209,16 @@ class Tester:
             fig_errors.clf()
             ax_errors.cla()
 
+t = Tester()
+t.fit(n_sims=3, cond_num=25, m=10, n=10, p_xax=0, p_comp=0)
+t.gen_data()
+s1 = "GradientDescentSolver"
+s2 = "ConjugateGradientsSolver"
+s3 = "IterativeRefinementGeneralSolver"
+t.test_spsd(s1)
+t.test_spsd(s2)
+t.test_spsd(solver=s3,intermediate_solver="DirectInverseSolver",intermediate_iter=20,intermediate_continuation=True)
+t.test_spsd(solver=s3,intermediate_solver="ConjugateGradientsSolver",intermediate_iter=20,intermediate_continuation=True)
 
 
 # ==================== GRAVEYARD ==================== #
@@ -217,11 +248,11 @@ def test_cg_linear(cond_num, m, n, num_samples=20, verbose=0):
         true_x = np.random.randn(n)
         b = np.dot(A, true_x)
 
-        x0 = np.random.randn(n)
-        x_arr, xopt = scla.cg(A, b, x0=x0)
+        x_0 = np.random.randn(n)
+        x_arr, xopt = scla.cg(A, b, x_0=x_0)
 
 
-        init_error = 100.0 * la.norm(x0 - true_x) #/ float(la.norm(true_x))), 2)
+        init_error = 100.0 * la.norm(x_0 - true_x) #/ float(la.norm(true_x))), 2)
         if verbose >= 2: print
         opt_error = 100.0 * la.norm(xopt - true_x) #/ float(la.norm(la.norm(true_x)))), 2)
 
@@ -276,11 +307,11 @@ def test_cg_nonlinear(cond_num, m, n, num_samples=20, verbose=0):
         true_x = np.random.randn(n)
         b = np.dot(A, true_x)
 
-        x0 = np.random.randn(n)
-        xopt, fopt, func_calls, grad_calls, warnflag = scopt.fmin_cg(f=norm_dif, x0=x0, args=(A, b), full_output=True)
+        x_0 = np.random.randn(n)
+        xopt, fopt, func_calls, grad_calls, warnflag = scopt.fmin_cg(f=norm_dif, x_0=x_0, args=(A, b), full_output=True)
         flags[warnflag] += 1
 
-        init_error = 100.0 * la.norm(x0 - true_x) #/ float(la.norm(true_x))), 2)
+        init_error = 100.0 * la.norm(x_0 - true_x) #/ float(la.norm(true_x))), 2)
         opt_error = 100.0 * la.norm(xopt - true_x) #/ float(la.norm(la.norm(true_x)))), 2)
 
         improvements.append(init_error - opt_error)
@@ -338,11 +369,11 @@ def test_minres(cond_num, n, shift, num_samples=20, verbose=0):
         b = np.dot(A, true_x)
 
         # randomly generate initial start
-        x0 = np.random.randn(n)
+        x_0 = np.random.randn(n)
         xopt,info = scla.minres(A,b)
 
 
-        init_error = la.norm(x0 - true_x) #/ float(la.norm(true_x))), 2)
+        init_error = la.norm(x_0 - true_x) #/ float(la.norm(true_x))), 2)
         opt_error = la.norm(xopt - true_x) #/ float(la.norm(la.norm(true_x)))), 2)
         pct_error = 100*(init_error - opt_error)/init_error
 
