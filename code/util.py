@@ -19,8 +19,10 @@ def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
         Singular values of returned matrix will usually be large (depending
         on the supplied cond_num and min_sing, but usually the max >> 1).
         If you leave min_sing==None, it returns a positive-definite matrix.
-        If min_sing < 0, it returns a negative-definite matrix.
+        If min_sing < 0, it returns a negative-definite matrix. Singular value
+        spectrum of returned matrix decreases roughly linearly (TODO: REPHRASE)
     """
+    assert min(m,n) > 1
     if cond_num < 1:
         raise la.linAlgError('Condition number must be greater than or equal to 1')
 
@@ -35,6 +37,35 @@ def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
 
     # Sparse? instead of np.diag(s)
     return np.dot(u, np.dot(np.diag(s), v))
+
+def decaying_psd(cond_num, n=50, min_sing=None):
+    """
+    Gives a symmetric, positive-definite matrix with a 'bad' singular value
+    spectrum shape (rapidly decaying values).
+    """
+    # =======================
+    assert n > 1
+    if cond_num < 1:
+        raise la.linAlgError('Condition number must be greater than or equal to 1')
+    if min_sing is None:
+        min_sing = abs(np.random.randn())
+    max_sing = min_sing * float(cond_num)
+    # =======================
+
+    s = [max_sing] + [max_sing*(1.0/i) for i in range(1,n-1)] + [min_sing]
+    for i in range(1, len(s)-1):
+        # add some noise to the values
+        s[i] += abs((0.1 * max_sing) * np.random.randn())
+
+    A = np.random.randn(n, n)
+    u,_,v = la.svd(A, full_matrices=False)
+
+    # Sparse? instead of np.diag(s)
+    return np.dot(u, np.dot(np.diag(sorted(s)), v))
+
+
+
+
 
 def small_sing_vals(cond_num, m=50, n=50, max_sing=0.8):
     """
@@ -72,6 +103,7 @@ def psd_from_cond(cond_num, n=50, min_sing=None):
         If you leave min_sing==None, it returns a positive-definite matrix.
         If min_sing < 0, it returns a negative-definite matrix.
     """
+    assert n > 1
     if min_sing is None:
         min_sing = abs(np.random.randn())
 
@@ -116,3 +148,29 @@ def s_pos_def(A):
     sing_vals = la.svd(A)[1]
 
     return not any([i <= 0 for i in sing_vals])
+
+def plot_sing_vals(mats):
+    """
+    Pass a matrix or list of matrices. Plots its (their) singular values on a
+    single plot.
+    """
+    if type(mats) == list:
+        for m in mats:
+            _, s, _ = la.svd(m)
+            plt.plot(s, marker='o')
+
+        plt.xlabel('Sing. val. #')
+        plt.ylabel('Sing val size')
+        plt.title('Singular values')
+        plt.legend([str(i) for i in range(len(mats))])
+        plt.show()
+
+    elif isinstance(mat, np.array):
+        _, s, _ = la.svd(mats)
+        plt.plot(s, marker='o')
+        plt.xlabel('Sing. val. #')
+        plt.ylabel('Sing val size')
+        plt.title('Singular values')
+        plt.show()
+    else:
+        raise ValueError('Please pass a matrix or list of matrices.')
