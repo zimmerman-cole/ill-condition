@@ -85,7 +85,7 @@ class Solver:
         print('Full-bare: %f' % la.norm(x_full - x_bare))
         print('Full-path: %f' % la.norm(x_full - x_path))
         print('Bare-path: %f' % la.norm(x_bare - x_path))
-        #print(la.norm(np.dot(la.inv(self.A), self.b) - x_full))
+        print(la.norm(np.dot(la.inv(self.A), self.b) - x_full))
 
 # || b - Ax ||
 def norm_dif(x, *args):
@@ -242,7 +242,7 @@ class GradientDescentSolver(Solver):
         else:
             x = np.copy(x0)
         # ======================================================================
-        path = [x]
+        path = [np.copy(x)]
 
         # First descent step ===================================================
         r = self.b - np.dot(self.A, x)
@@ -254,7 +254,7 @@ class GradientDescentSolver(Solver):
         Ar = np.dot(self.A, r)
         a = np.inner(r.T, r) / np.dot(r.T, Ar)
         x += a * r
-        path.append(x)
+        path.append(np.copy(x))
 
         # Rest of descent ======================================================
         for i in range(1, max_iter):
@@ -271,7 +271,7 @@ class GradientDescentSolver(Solver):
             # If not, take another step
             Ar = np.dot(self.A, r)
             x += a * r
-            path.append(x)
+            path.append(np.copy(x))
 
         return path
 
@@ -424,7 +424,7 @@ class ConjugateGradientsSolver(Solver):
         else:
             x = np.copy(x0)
         # ======================================================================
-        path = [x]
+        path = [np.copy(x)]
         # First descent step (GD) ==============================================
         r = self.b - np.dot(self.A, x)
         # Check if close enough already
@@ -437,7 +437,7 @@ class ConjugateGradientsSolver(Solver):
         Ad = np.dot(self.A, d)
         a = rTr / np.dot(d.T, Ad)
         x += a * d
-        path.append(x)
+        path.append(np.copy(x))
 
         for i in range(1, max_iter):
             if (i % recalc) == 0:
@@ -458,7 +458,7 @@ class ConjugateGradientsSolver(Solver):
             a = rTr / np.dot(d.T, Ad)
 
             x += a * d
-            path.append(x)
+            path.append(np.copy(x))
 
         return path
 
@@ -516,7 +516,6 @@ class IterativeRefinementSolver(Solver):
             if x_true is not None:
                 x_difs.append(la.norm(x - x_true))
 
-        print(x)
         if x_true is None:
             return x, i, residuals
         else:
@@ -539,7 +538,6 @@ class IterativeRefinementSolver(Solver):
 
             x += np.dot(la.inv(A_e), r)
 
-        print(x)
         return x
 
     def path(self, tol=10**-5, x0=None, max_iter = 500, **kwargs):
@@ -548,13 +546,15 @@ class IterativeRefinementSolver(Solver):
         else:
             eps = float(kwargs['eps'])
 
+
+
         self._check_ready()
         if x0 is None:
             x = np.zeros(len(self.A))
         else:
             x = np.copy(x0)
 
-        path = [x]
+        path = [np.copy(x)]
 
         for i in range(max_iter):
             r = self.b - np.dot(self.A, x)
@@ -566,9 +566,8 @@ class IterativeRefinementSolver(Solver):
             A_e = self.A + eps * np.identity(len(self.A))
 
             x += np.dot(la.inv(A_e), r)
-            path.append(x)
+            path.append(np.copy(x))
 
-        print(path[0])
         return x
 
 # TO DO: BiCGStab
