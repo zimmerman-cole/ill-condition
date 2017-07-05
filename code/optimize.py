@@ -36,7 +36,7 @@ class Solver:
             (np.array)        x0:   Initial guess for x.
             (int)       max_iter:   Maximum number of iterations.
             (np.array)    x_true:   True solution to system. If provided (and
-                                      full_output=True), the solver tracks
+                                      full_outFput=True), the solver tracks
                                       ||x - x_true|| at each iteration.
                           kwargs:   Solver-specific parameters, e.g.
                                         -'eps' for iterative refinement
@@ -85,7 +85,7 @@ class Solver:
         print('Full-bare: %f' % la.norm(x_full - x_bare))
         print('Full-path: %f' % la.norm(x_full - x_path))
         print('Bare-path: %f' % la.norm(x_bare - x_path))
-        print(la.norm(np.dot(la.inv(self.A), self.b) - x_full))
+        #print(la.norm(np.dot(la.inv(self.A), self.b) - x_full))
 
 # || b - Ax ||
 def norm_dif(x, *args):
@@ -568,7 +568,8 @@ class IterativeRefinementSolver(Solver):
             x += np.dot(la.inv(A_e), r)
             path.append(np.copy(x))
 
-        return x
+
+        return path
 
 # TO DO: BiCGStab
 
