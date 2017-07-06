@@ -8,31 +8,33 @@ from scipy import optimize as scopt
 from scipy.sparse import linalg as scla
 from collections import OrderedDict
 
-## ================== SIMULATION PARAMS ================== ##
-#   n_sims:   (int):  number of simulations
-# cond_num:   (int):  condition number
-#        m:   (int):  rows of `A`
-#        n:   (int):  cols of `A`
-#   solver:   (str):  which solver type to run sims
-## =================== PLOTTING PARAMS =================== ##
-#    p_xax:  (bool):  x-axis option
-#                       0: iteration, 1: time
-#   p_comp:  (bool):  compare plots
-#                       0: plot separately, 1: hold plots
-## ==================== EXPORT PARAMS ==================== ##
-#   e_name:   (str):  export directory name
-#                       mkdir `e_name` under test_results
-## ===================== EXAMPLE SIM ===================== ##
-# t = Tester()
-# t.fit(n_sims=3, cond_num=25, m=10, n=10, p_xax=0, p_comp=0)
-# t.gen_data()
-# s1 = "GradientDescentSolver"
-# s2 = "ConjugateGradientsSolver"
-# t.test_spsd(s1)
-# t.test_spsd(s2)
-## ======================================================= ##
-
 class Tester:
+    """
+    ## ================== SIMULATION PARAMS ================== ##
+    #   n_sims:   (int):  number of simulations
+    # cond_num:   (int):  condition number
+    #        m:   (int):  rows of `A`
+    #        n:   (int):  cols of `A`
+    #   solver:   (str):  which solver type to run sims
+    ## =================== PLOTTING PARAMS =================== ##
+    #    p_xax:  (bool):  x-axis option
+    #                       0: iteration, 1: time
+    #   p_comp:  (bool):  compare plots
+    #                       0: plot separately, 1: hold plots
+    ## ==================== EXPORT PARAMS ==================== ##
+    #   e_name:   (str):  export directory name
+    #                       mkdir `e_name` under test_results
+    ## ===================== EXAMPLE SIM ===================== ##
+    # t = Tester()
+    # t.fit(n_sims=3, cond_num=25, m=10, n=10, p_xax=0, p_comp=0)
+    # t.gen_data()
+    # s1 = "GradientDescentSolver"
+    # s2 = "ConjugateGradientsSolver"
+    # t.test_spsd(s1)
+    # t.test_spsd(s2)
+    ## ======================================================= ##
+    """
+
     def __init__(self, \
                  n_sims=None, cond_num=None, m=None, n=None, solver=None, \
                  p_xax=None, \
@@ -157,10 +159,14 @@ class Tester:
 
             ## set axes
             if self.p_xax == 0:
-                xax = range(len(residuals))
+                xax_residuals = range(len(residuals))
+                xax_errors = range(len(errors))
+                print("rl: %s" % len(residuals))
+                print("el: %s" % len(errors))
                 xlab = "Iteration"
             else:
-                xax = [x[1] for x in residuals]
+                xax_residuals = [x[1] for x in residuals]
+                xax_errors = [x[1] for x in residuals]
                 xlab = "Time"
 
             ## y vectors
@@ -171,20 +177,24 @@ class Tester:
 
             ## plot residuals
             plt.figure("residuals")
-            ax_residuals.plot(xax, y_residuals, label='sim-%s resids' % sim)
+            ax_residuals.plot(xax_residuals, y_residuals, label='sim-%s resids' % sim)
             plt.yscale('log')
             plt.xlabel(xlab)
             plt.ylabel(ylab_residuals)
 
             ## plot errors
             plt.figure("errors")
-            ax_errors.plot(xax, y_errors, label='sim-%s errs' % sim)
+            ax_errors.plot(xax_errors, y_errors, label='sim-%s errs' % sim)
             plt.yscale('log')
             plt.xlabel(xlab)
             plt.ylabel(ylab_errors)
 
         ## save plot(s)
-        path_out = "../test_results/"+str(solver_name)+"/"+self.e_name
+        if bool(kwargs) == True:
+            path_out = "../test_results/"+str(solver_name)+"/"+str(intermediate_solver_name)+"/"+self.e_name
+        else:
+            path_out = "../test_results/"+str(solver_name)+"/"+self.e_name
+
         if not os.path.exists(path_out):
             os.makedirs(path_out)
 
@@ -210,7 +220,7 @@ class Tester:
             ax_errors.cla()
 
 t = Tester()
-t.fit(n_sims=3, cond_num=25, m=10, n=10, p_xax=0, p_comp=0)
+t.fit(n_sims=3, cond_num=10**5, m=100, n=100, p_xax=0, p_comp=0)
 t.gen_data()
 s1 = "GradientDescentSolver"
 s2 = "ConjugateGradientsSolver"
