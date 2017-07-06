@@ -200,35 +200,43 @@ class Tester:
 
         plt.figure("residuals")
         if bool(kwargs) == True:
-            plt.title('%s Simulation Results (Intermediate: %s )' % (solver_name, intermediate_solver_name))
+            plt.suptitle('%s with %s' % (solver_name, intermediate_solver_name))
+            plt.title('Continuation: %s, Int Iters: %s' % (self.intermediate_continuation,self.intermediate_iter))
+            fname_resids = path_out+'/residuals'+'_cont.'+str(self.intermediate_continuation)+'.png'
         else:
-            plt.title('%s Simulation Results' % (solver_name))
+            plt.title('%s' % (solver_name))
+            fname_resids = path_out+'/residuals.png'
+
         ax_residuals.legend(prop={'size':5})
-        fig_residuals.savefig(path_out+'/residuals.png')
+        fig_residuals.savefig(fname_resids)
 
         plt.figure("errors")
         if bool(kwargs) == True:
-            plt.title('%s Simulation Results (Intermediate: %s )' % (solver_name, intermediate_solver_name))
+            plt.suptitle('%s with %s' % (solver_name, intermediate_solver_name))
+            plt.title('Continuation: %s, Int Iters: %s' % (self.intermediate_continuation,self.intermediate_iter))
+            fname_errors = path_out+'/errors'+'_cont.'+str(self.intermediate_continuation)+'.png'
         else:
             plt.title('%s Simulation Results' % (solver_name))
+            fname_errors = path_out+'/errors.png'
+
         ax_errors.legend(prop={'size':5})
-        fig_errors.savefig(path_out+'/errors.png')
+        fig_errors.savefig(fname_errors)
         if self.p_comp == 0:
             fig_residuals.clf()
             ax_residuals.cla()
             fig_errors.clf()
             ax_errors.cla()
 
-t = Tester()
-t.fit(n_sims=3, cond_num=10**5, m=100, n=100, p_xax=0, p_comp=0)
-t.gen_data()
-s1 = "GradientDescentSolver"
-s2 = "ConjugateGradientsSolver"
-s3 = "IterativeRefinementGeneralSolver"
-t.test_spsd(s1)
-t.test_spsd(s2)
-t.test_spsd(solver=s3,intermediate_solver="DirectInverseSolver",intermediate_iter=20,intermediate_continuation=True)
-t.test_spsd(solver=s3,intermediate_solver="ConjugateGradientsSolver",intermediate_iter=20,intermediate_continuation=True)
+# t = Tester()
+# t.fit(n_sims=3, cond_num=10**5, m=100, n=100, p_xax=0, p_comp=0)
+# t.gen_data()
+# s1 = "GradientDescentSolver"
+# s2 = "ConjugateGradientsSolver"
+# s3 = "IterativeRefinementGeneralSolver"
+# t.test_spsd(s1)
+# t.test_spsd(s2)
+# t.test_spsd(solver=s3,intermediate_solver="DirectInverseSolver",intermediate_iter=20,intermediate_continuation=True)
+# t.test_spsd(solver=s3,intermediate_solver="ConjugateGradientsSolver",intermediate_iter=20,intermediate_continuation=True)
 
 
 # ==================== GRAVEYARD ==================== #
