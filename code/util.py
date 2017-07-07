@@ -136,7 +136,6 @@ def ghetto_command_line():
         except BaseException:
             traceback.print_exc()
 
-# TODO: FIX POTENTIAL kwargs CONFLICT WHEN PASSING SOLVER-SPECIFIC PARAMS
 def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, \
             construct_args=dict(), solve_args=dict() ):
     """

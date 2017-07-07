@@ -932,7 +932,6 @@ class IterativeRefinementGeneralSolver(Solver):
 
 # TODO: BiCGStab
 
-
 # TODO: L-BFGS (use scipy?)
 
 
