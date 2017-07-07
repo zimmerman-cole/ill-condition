@@ -903,96 +903,9 @@ class IterativeRefinementGeneralSolver(Solver):
         return x
 
 
-# TO DO: BiCGStab
+# TODO: BiCGStab
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# This works, but much slower than CG for large/high condition number matrices
-def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_output=False):
-    """
-    Iterative refinement with epsilon smoothing.
-
-    e: epsilon, value added to diagonal of A to lower condition number (decreases
-                    w/ each iteration)
-    """
-    ATA = np.dot(A.T, A)
-    ATb = np.dot(A.T, b)
-
-    n = len(ATA)
-    if x is None:
-        x = np.zeros(n)
-    if e is None:
-        e = 2*la.norm(ATA)
-
-    #min_err = (np.copy(x), norm_dif(x, A, b))
-
-    if full_output:
-        resids = OrderedDict()
-        start_time = time.time()
-
-    for i in range(numIter):
-        e = 0.5 * e
-        if np.random.uniform() < 0.01:
-            print('IR iter %d; e: %f' % (i, e))
-
-
-        r = ATb - np.dot(ATA, x)
-        r_norm = la.norm(r)
-
-        # break if residual blows up (becomes nan)
-        if r_norm != r_norm:
-            break
-
-        if full_output:
-            resids[time.time() - start_time] = r_norm
-
-        # exit if close enough
-        if r_norm < tol:
-            if full_output:
-                return x, i, True, resids
-            else:
-                return x
-
-        A_e = np.copy(ATA) + e * np.identity(n)
-
-        #print('ITER REFINE %d' % i)
-        #d = gradient_descent_helper(np.copy(A_e), np.copy(r), np.copy(x))
-        #d = conjugate_gradient(np.copy(A_e), np.copy(r), x=np.copy(x))
-
-
-        x += np.dot(la.inv(A_e), r)
-
-        #if norm_dif(x, A, b) < min_err[1]: min_err = (np.copy(x), norm_dif(x, A, b))
-
-
-    #print('IR: Max iteration reached (%d)' % numIter)
-    if full_output:
-        resids[time.time() - start_time] = norm_dif(x, A, b)
-        return x, numIter, False, resids
-    else:
-        return x
-
+# TODO: L-BFGS (use scipy?)
 
 
 
@@ -1227,6 +1140,72 @@ def iter_refinement(A, b, tol=0.001, numIter=500, x=None, full_output=False):
         return x, numIter, False, resids
     else:
         return x
+
+# This works, but much slower than CG for large/high condition number matrices
+def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_output=False):
+    """
+    Iterative refinement with epsilon smoothing.
+
+    e: epsilon, value added to diagonal of A to lower condition number (decreases
+                    w/ each iteration)
+    """
+    ATA = np.dot(A.T, A)
+    ATb = np.dot(A.T, b)
+
+    n = len(ATA)
+    if x is None:
+        x = np.zeros(n)
+    if e is None:
+        e = 2*la.norm(ATA)
+
+    #min_err = (np.copy(x), norm_dif(x, A, b))
+
+    if full_output:
+        resids = OrderedDict()
+        start_time = time.time()
+
+    for i in range(numIter):
+        e = 0.5 * e
+        if np.random.uniform() < 0.01:
+            print('IR iter %d; e: %f' % (i, e))
+
+
+        r = ATb - np.dot(ATA, x)
+        r_norm = la.norm(r)
+
+        # break if residual blows up (becomes nan)
+        if r_norm != r_norm:
+            break
+
+        if full_output:
+            resids[time.time() - start_time] = r_norm
+
+        # exit if close enough
+        if r_norm < tol:
+            if full_output:
+                return x, i, True, resids
+            else:
+                return x
+
+        A_e = np.copy(ATA) + e * np.identity(n)
+
+        #print('ITER REFINE %d' % i)
+        #d = gradient_descent_helper(np.copy(A_e), np.copy(r), np.copy(x))
+        #d = conjugate_gradient(np.copy(A_e), np.copy(r), x=np.copy(x))
+
+
+        x += np.dot(la.inv(A_e), r)
+
+        #if norm_dif(x, A, b) < min_err[1]: min_err = (np.copy(x), norm_dif(x, A, b))
+
+
+    #print('IR: Max iteration reached (%d)' % numIter)
+    if full_output:
+        resids[time.time() - start_time] = norm_dif(x, A, b)
+        return x, numIter, False, resids
+    else:
+        return x
+
 
 # this doesn't work ever
 def iter_refinement_const_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_output=False):

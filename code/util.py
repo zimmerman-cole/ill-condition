@@ -63,10 +63,6 @@ def decaying_psd(cond_num, n=50, min_sing=None):
     # Sparse? instead of np.diag(s)
     return np.dot(u, np.dot(np.diag(sorted(s)), v))
 
-
-
-
-
 def small_sing_vals(cond_num, m=50, n=50, max_sing=0.8):
     """
     Use to generate a matrix whose singular values all have magnitude less than
@@ -165,7 +161,7 @@ def plot_sing_vals(mats):
         plt.legend([str(i) for i in range(len(mats))])
         plt.show()
 
-    elif isinstance(mat, np.array):
+    elif isinstance(mat, np.ndarray):
         _, s, _ = la.svd(mats)
         plt.plot(s, marker='o')
         plt.xlabel('Sing. val. #')
