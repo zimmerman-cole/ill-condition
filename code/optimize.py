@@ -16,7 +16,7 @@ class Solver:
         self.A, self.b = A, b
         self.full_output = full_output
 
-        ## intermediate solver parameters
+        ## intermediate solver parameters (for IR solvers)
         if bool(kwargs) == True:
             self.intermediate_solver = kwargs["intermediate_solver"]
             self.intermediate_iter = kwargs["intermediate_iter"]
@@ -77,10 +77,10 @@ class Solver:
             return self._bare(tol, x, max_iter, **kwargs)
 
     def _full(*args, **kwargs):
-        print('_full not implemented?')
+        raise NotImplementedError('_full not implemented?')
 
     def _bare(*args, **kwargs):
-        print('_bare not implemented?')
+        raise NotImplementedError('_bare not implemented?')
 
     def test_methods(self):
         """
@@ -372,7 +372,6 @@ class ConjugateGradientsSolver(Solver):
     def __repr__(self):
         return self.__str__()
 
-
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         if 'recalc' not in kwargs:
             recalc = 20
@@ -532,8 +531,137 @@ class ConjugateGradientsSolver(Solver):
 
         return path
 
+class PreconditionedCGSolver(Solver):
+    """
+    See algorithm 5.3 (page 119) in Nocedal and Wright.
+    Requires an intermediate solver.
+    """
+
+    def __init__(self, A, b, M, \
+                    intermediate_solver, \
+                    intermediate_iter, intermediate_tol, \
+                    full_output=False):
+        self.A, self.b = A, b
+        self.full_output = full_output
+        self.M = M
+
+        # For solving:   M * y(i) = r(i)
+        self.intermediate_solver = intermediate_solver
+        self.intermediate_iter = int(intermediate_iter)
+        self.intermediate_tol = float(intermediate_tol)
+
+    def _check_ready(self):
+        if len(self.A) != len(self.b):
+            raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
+
+        assert isinstance(self.M, np.ndarray)
+        assert len(self.A) == len(self.A.T)
+        assert self.M.shape == self.A.shape
+
+
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
+        """
+        See algorithm 5.3 (page 119) in Nocedal and Wright.
+        NOTE: Calculates residuals by Ax - b (instead of b - Ax like other
+            methods implemented here).
+        """
+
+        if 'recalc' not in kwargs:
+            recalc = 20
+        else:
+            recalc = int(kwargs['recalc'])
+
+        start_time = time.time()
+        if x_true is not None:
+            x_difs = [la.norm(x - x_true)]
+
+        r = np.dot(self.A, x) - self.b
+        r_norm = la.norm(r)
+        residuals = [(r_norm, time.time() - start_time)]
+
+        # Check if close enough already
+        if r_norm <= tol:
+            if x_true is None:
+                return x, 0, residuals
+            else:
+                return x, 0, residuals, x_difs
+
+
+        # FIRST DESCENT STEP: find initial search direction p(0) by solving
+        # M y(0) = r(0) for y(0) and letting p(0) = -y(0)
+        i = 0
+        inter_solver = self.intermediate_solver(A=self.M, b=r)
+        y = inter_solver.solve(tol=self.intermediate_tol, x_0=np.copy(x), \
+                                max_iter=self.intermediate_iter)
+        p = -np.copy(y)
+
+        Ap = np.dot(self.A, p)
+        rTy = np.dot(r.T, y)
+
+        a = rTy / float(np.dot(p.T, Ap))        # (5.39a)
+        x += a * p                              # (5.39b)
+
+
+        if x_true is not None:
+            x_difs.append(la.norm(x - x_true))
+        # ======================================================================
+
+        while i < max_iter:
+            if (i % recalc) == 0:
+                new_r = np.dot(self.A, x) - self.b
+            else:
+                new_r = r + (a * Ap)                        # (5.39c)
+
+            r_norm = la.norm(new_r)
+            residuals.append((r_norm, time.time() - start_time))
+
+            # Check if close enough
+            if r_norm < tol:
+                break
+
+            i += 1
+
+            # If not, take another step
+            inter_solver.b = new_r
+            new_y = inter_solver.solve(tol=self.intermediate_tol, x_0=np.copy(x), \
+                                            max_iter=self.intermediate_iter)
+                                                    # ^ (5.39d) ^
+
+            new_rTy = np.dot(new_r.T, new_y)
+
+            beta = new_rTy / rTy                    # (5.39e)
+
+            p = -new_y + beta * p                   # (5.39f)
+
+            r, rTy, y = new_r, new_rTy, new_y
+            Ap = Ap = np.dot(self.A, p)
+
+            a = rTy / np.dot(p.T, Ap)               # (5.39a)
+            x += a * p                              # (5.39b)
+
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
+
+        if x_true is None:
+            return x, i, residuals
+        else:
+            return x, i, residuals, x_difs
+
+
+
+
+
+
+
+
+
+
+
 # TODO: add parameter governing epsilon's decay rate
 class IterativeRefinementSolver(Solver):
+    """
+    Solves Ad = r by directly inverting A (d = A^-1 r).
+    """
 
     def __str__(self):
         l1 = 'Iterative Refinement Solver\n'
@@ -768,6 +896,29 @@ class IterativeRefinementGeneralSolver(Solver):
 
 
 # TO DO: BiCGStab
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # This works, but much slower than CG for large/high condition number matrices
 def iter_refinement_eps(A, b, tol=0.001, numIter=500, x=None, e=None, full_output=False):
