@@ -199,3 +199,54 @@ def compare_cg(plot=True):
     print('SOLVER =================')
     print('Avg time: %f' % cl_avg_time)
     print('Avg err: %f' % cl_avg_err)
+
+def plot_CGs(cond_num=10**5, n=500, max_iter=10000):
+    A = util.psd_from_cond(cond_num=cond_num, n=n)
+    x_true = 4 * np.random.randn(n)
+    b = np.dot(A, x_true)
+
+    print('Initial err: %f' % norm_dif(np.zeros(n), A, b))
+
+
+    CG = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=True)
+    xopt, n_iter, resids, x_difs = CG.solve(max_iter=max_iter, x_true=x_true)
+    print('Standard final err: %f (%d iter)' % (norm_dif(xopt, A, b), n_iter))
+
+    M_iden = np.identity(len(A))
+
+    iden_CG = optimize.PreconditionedCGSolver(A=A, b=b, M=M_iden, \
+                        intermediate_solver=optimize.DirectInverseSolver, \
+                        intermediate_iter=100, intermediate_tol=10**-5, \
+                        full_output=True)
+
+    iden_xopt, n_iter, iden_resids, iden_x_difs = iden_CG.solve(max_iter=max_iter, x_true=x_true)
+
+    print('Final err iden: %f (%d iter)' % (norm_dif(iden_xopt, A, b), n_iter))
+
+    M_max = precondition.max_diag(A)
+    max_CG = optimize.PreconditionedCGSolver(A=A, b=b, M=M_max, \
+                        intermediate_solver=optimize.DirectInverseSolver, \
+                        intermediate_iter=100, intermediate_tol=10**-5, \
+                        full_output=True)
+
+    max_xopt, n_iter, max_resids, max_x_difs = max_CG.solve(max_iter=max_iter, x_true=x_true)
+
+    print('Final err max: %f (%d iter)' % (norm_dif(max_xopt, A, b), n_iter))
+
+    # (norm, time)
+    plt.figure(0)
+    plt.title('Residuals')
+    plt.plot([t for (n,t) in resids], [n for (n,t) in resids], marker='o')
+    plt.plot([t for (n,t) in iden_resids], [n for (n,t) in iden_resids], marker='o')
+    plt.plot([t for (n,t) in max_resids], [n for (n,t) in max_resids], marker='o')
+    plt.legend(['Standard', 'Iden', 'Max'])
+    plt.yscale('log')
+
+    plt.figure(1)
+    plt.title('Errors')
+    plt.plot([t for (n,t) in resids], [i for i in x_difs], marker='o')
+    plt.plot([t for (n,t) in iden_resids], [i for i in iden_x_difs], marker='o')
+    plt.plot([t for (n,t) in max_resids], [i for i in max_x_difs], marker='o')
+    plt.legend(['Standard', 'Iden', 'Max'])
+    plt.yscale('log')
+    plt.show()

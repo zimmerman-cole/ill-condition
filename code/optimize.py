@@ -97,6 +97,19 @@ class Solver:
 
 class DirectInverseSolver(Solver):
 
+    def __init__(self, A, b, full_output=False):
+        self.A = A
+        self.A_inv = la.inv(A)
+        self.b = b
+        self.full_output = full_output
+
+
+    def _check_ready(self):
+        """
+        TODO:
+        """
+        pass
+
     def __str__(self):
         l1 = 'Direct Inverse Solver\n'
         if self.A is None:
@@ -131,7 +144,7 @@ class DirectInverseSolver(Solver):
         residuals.append((r_norm, time.time() - start_time))
 
         ## solve
-        x = la.solve(self.A,self.b)
+        x = np.dot(self.A_inv, self.b)
 
         ## residuals (1)
         r = self.b - np.dot(self.A, x)
@@ -147,12 +160,12 @@ class DirectInverseSolver(Solver):
             return x, i, residuals, x_difs
 
     def _bare(self, tol, x, max_iter, **kwargs):
-        x = la.solve(self.A,self.b)
-        return x
+        #x = la.solve(self.A,self.b)
+        return np.dot(self.A_inv, self.b)
 
     def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
         path = [x]
-        x = la.solve(self.A,self.b)
+        x = np.dot(self.A_inv, self.b)
         path.append(x)
         return path
 
@@ -401,11 +414,12 @@ class ConjugateGradientsSolver(Solver):
         Ad = np.dot(self.A, d)
         a = rTr / np.dot(d.T, Ad)
         x += a * d
-        if x_true is not None:
-            x_difs.append(la.norm(x - x_true))
+
         # ======================================================================
 
         while i < max_iter:
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
             if (i % recalc) == 0:
                 new_r = self.b - np.dot(self.A, x)
             else:
@@ -431,8 +445,6 @@ class ConjugateGradientsSolver(Solver):
             a = rTr / np.dot(d.T, Ad)
 
             x += a * d
-            if x_true is not None:
-                x_difs.append(la.norm(x - x_true))
 
         if x_true is None:
             return x, i, residuals
@@ -589,7 +601,7 @@ class PreconditionedCGSolver(Solver):
 
         # FIRST DESCENT STEP: find initial search direction p(0) by solving
         # M y(0) = r(0) for y(0) and letting p(0) = -y(0)
-        i = 0
+        i = 1
         inter_solver = self.intermediate_solver(A=self.M, b=r)
         y = inter_solver.solve(tol=self.intermediate_tol, x_0=np.copy(x), \
                                 max_iter=self.intermediate_iter)
@@ -601,12 +613,11 @@ class PreconditionedCGSolver(Solver):
         a = rTy / float(np.dot(p.T, Ap))        # (5.39a)
         x += a * p                              # (5.39b)
 
-
-        if x_true is not None:
-            x_difs.append(la.norm(x - x_true))
         # ======================================================================
 
         while i < max_iter:
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
             if (i % recalc) == 0:
                 new_r = np.dot(self.A, x) - self.b
             else:
@@ -639,9 +650,8 @@ class PreconditionedCGSolver(Solver):
             a = rTy / np.dot(p.T, Ap)               # (5.39a)
             x += a * p                              # (5.39b)
 
-            if x_true is not None:
-                x_difs.append(la.norm(x - x_true))
 
+        #print(len(residuals), len(x_difs))
         if x_true is None:
             return x, i, residuals
         else:
