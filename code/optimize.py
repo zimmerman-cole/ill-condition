@@ -238,12 +238,12 @@ class GradientDescentSolver(Solver):
         Ar = np.dot(self.A, r)
         a = np.inner(r.T, r) / np.dot(r.T, Ar)
         x += a * r
-        if x_true is not None:
-            x_difs.append(la.norm(x - x_true))
         # =========================================================
 
         # Rest of descent
         while i < max_iter:
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
             # Directly calculate residual every 'recalc' steps
             if (i % recalc) == 0:
                 r = self.b - np.dot(self.A, x)
@@ -260,8 +260,6 @@ class GradientDescentSolver(Solver):
             # If not, take another step
             Ar = np.dot(self.A, r)
             x += a * r
-            if x_true is not None:
-                x_difs.append(la.norm(x - x_true))
 
         if x_true is None:
             return x, i, residuals
@@ -701,12 +699,13 @@ class IterativeRefinementSolver(Solver):
         start_time = time.time()
         residuals = []
         if x_true is not None:
-            x_difs = [la.norm(x - x_true)]
+            x_difs = []
 
 
         i = 0
         while i < max_iter:
-
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
             r = self.b - np.dot(self.A, x)
             r_norm = la.norm(r)
             residuals.append((r_norm, time.time() - start_time))
@@ -721,8 +720,7 @@ class IterativeRefinementSolver(Solver):
 
             x += np.dot(la.inv(A_e), r)
 
-            if x_true is not None:
-                x_difs.append(la.norm(x - x_true))
+
 
         if x_true is None:
             return x, i, residuals
@@ -813,11 +811,13 @@ class IterativeRefinementGeneralSolver(Solver):
         start_time = time.time()
         residuals = []
         if x_true is not None:
-            x_difs = [la.norm(x - x_true)]
+            x_difs = []
 
         i = 0
         while i < max_iter:
-
+            ## track
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
             r = self.b - np.dot(self.A, x)
             r_norm = la.norm(r)
             residuals.append((r_norm, time.time() - start_time))
@@ -839,9 +839,7 @@ class IterativeRefinementGeneralSolver(Solver):
             ## update x
             x += d_i
 
-            ## track
-            if x_true is not None:
-                x_difs.append(la.norm(x - x_true))
+
 
         if x_true is None:
             return x, i, residuals
