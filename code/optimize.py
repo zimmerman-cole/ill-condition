@@ -79,6 +79,7 @@ class Solver:
     def path(*args, **kwargs):
         raise NotImplementedError('path not implemented?')
 
+
     def test_methods(self):
         """
         Make sure _full, _bare and path give roughly the same x.
@@ -621,6 +622,7 @@ class PreconditionedCGSolver(Solver):
         while i < max_iter:
             if x_true is not None:
                 x_difs.append(la.norm(x - x_true))
+
             if (i % recalc) == 0:
                 new_r = np.dot(self.A, x) - self.b
             else:
@@ -653,8 +655,6 @@ class PreconditionedCGSolver(Solver):
             a = rTy / np.dot(p.T, Ap)               # (5.39a)
             x += a * p                              # (5.39b)
 
-
-        #print(len(residuals), len(x_difs))
         if x_true is None:
             return x, i, residuals
         else:
@@ -828,7 +828,7 @@ class IterativeRefinementGeneralSolver(Solver):
 
         if self.intermediate_solver is None:
             raise AttributeError('Please specify an intermediate solver.')
-        
+
 
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         if 'eps' not in kwargs:
@@ -932,6 +932,7 @@ class IterativeRefinementGeneralSolver(Solver):
 
 
 # TODO: BiCGStab
+
 
 # TODO: L-BFGS (use scipy?)
 
