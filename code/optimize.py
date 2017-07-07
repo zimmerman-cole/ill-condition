@@ -655,6 +655,7 @@ class PreconditionedCGSolver(Solver):
             a = rTy / np.dot(p.T, Ap)               # (5.39a)
             x += a * p                              # (5.39b)
 
+
         if x_true is None:
             return x, i, residuals
         else:
