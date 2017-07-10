@@ -161,6 +161,7 @@ def visual_gd_bad_start():
     # ax.quiver(X_minor, Y_minor, U_minor, V_minor, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
     # ax.quiver(X_major, Y_major, U_major, V_major, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
     # ax.quiver(X_worst, Y_worst, U_worst, V_worst, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
+<<<<<<< 97ddbab9292de26e3394b144454ba7a27b0a200d
 
     plt.draw()
     plt.show()
@@ -355,3 +356,6 @@ def vis_2x2(cond_num=None, solver=None, addl_plot=None):
 if __name__ == "__main__":
     # vis_2x2(cond_num=10,solver="ConjugateGradientsSolver",addl_plot=True)
     vis_2x2(cond_num=30,solver="GradientDescentSolver", addl_plot=False)
+
+    plt.draw()
+    plt.show()
