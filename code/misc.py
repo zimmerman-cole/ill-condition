@@ -200,53 +200,51 @@ def compare_cg(plot=True):
     print('Avg time: %f' % cl_avg_time)
     print('Avg err: %f' % cl_avg_err)
 
-def plot_CGs(cond_num=10**5, n=500, max_iter=10000):
-    A = util.psd_from_cond(cond_num=cond_num, n=n)
-    x_true = 4 * np.random.randn(n)
+def visual_IR(start_x=0.0, start_y=0.0):
+    A = util.psd_from_cond(cond_num=10000, n=2)
+    x_true = 4 * np.random.randn(2)
     b = np.dot(A, x_true)
 
-    print('Initial err: %f' % norm_dif(np.zeros(n), A, b))
+    start_pos = np.array([float(start_x), float(start_y)])
+    print('Initial error: %f' % norm_dif(start_pos, A, b))
 
+    x_opt = optimize.iter_refinement_eps(A, b, x=start_pos, numIter=100)
+    path = IR_path(A, b, x=start_pos)
+    if la.norm(path[-1] - x_opt) > 0.01:
+        print('IR_path and optimize.iter_refine_eps just spit out different minimums.')
+        print('IR_path: ' + str(path[-1]))
+        print('opt version: ' + str(x_opt))
+        sys.exit(0)
 
-    CG = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=True)
-    xopt, n_iter, resids, x_difs = CG.solve(max_iter=max_iter, x_true=x_true)
-    print('Standard final err: %f (%d iter)' % (norm_dif(xopt, A, b), n_iter))
+    print('Final error: %f' % norm_dif(x_opt, A, b))
 
-    M_iden = np.identity(len(A))
+    # How wide to view the descent space (Euclidean dist. btwn start and endpoint)
+    span = np.sqrt((path[0][0] - x_opt[0])**2 + (path[0][1] - x_opt[1])**2)
 
-    iden_CG = optimize.PreconditionedCGSolver(A=A, b=b, M=M_iden, \
-                        intermediate_solver=optimize.DirectInverseSolver, \
-                        intermediate_iter=100, intermediate_tol=10**-5, \
-                        full_output=True)
+    num = 100
+    #x1 = x2 = np.linspace(-span, span, num)
+    x1 = np.linspace(x_true[0]-span, x_true[0]+span, num)
+    x2 = np.linspace(x_true[1]-span, x_true[1]+span, num)
+    x1v, x2v = np.meshgrid(x1, x2, indexing='ij', sparse=False)
+    hv = np.zeros([num,num])
 
-    iden_xopt, n_iter, iden_resids, iden_x_difs = iden_CG.solve(max_iter=max_iter, x_true=x_true)
+    for i in range(len(x1)):
+        for j in range(len(x2)):
+            xx = np.array([x1v[i,j],x2v[i,j]])
+            hv[i,j] = np.dot(xx.T,np.dot(A,xx))-np.dot(b.T,xx)
+            # f(x) = .5 x.T*A*x - b.T*x
 
-    print('Final err iden: %f (%d iter)' % (norm_dif(iden_xopt, A, b), n_iter))
-
-    M_max = precondition.max_diag(A)
-    max_CG = optimize.PreconditionedCGSolver(A=A, b=b, M=M_max, \
-                        intermediate_solver=optimize.DirectInverseSolver, \
-                        intermediate_iter=100, intermediate_tol=10**-5, \
-                        full_output=True)
-
-    max_xopt, n_iter, max_resids, max_x_difs = max_CG.solve(max_iter=max_iter, x_true=x_true)
-
-    print('Final err max: %f (%d iter)' % (norm_dif(max_xopt, A, b), n_iter))
-
-    # (norm, time)
-    plt.figure(0)
-    plt.title('Residuals')
-    plt.plot([t for (n,t) in resids], [n for (n,t) in resids], marker='o')
-    plt.plot([t for (n,t) in iden_resids], [n for (n,t) in iden_resids], marker='o')
-    plt.plot([t for (n,t) in max_resids], [n for (n,t) in max_resids], marker='o')
-    plt.legend(['Standard', 'Iden', 'Max'])
-    plt.yscale('log')
-
-    plt.figure(1)
-    plt.title('Errors')
-    plt.plot([t for (n,t) in resids], [i for i in x_difs], marker='o')
-    plt.plot([t for (n,t) in iden_resids], [i for i in iden_x_difs], marker='o')
-    plt.plot([t for (n,t) in max_resids], [i for i in max_x_difs], marker='o')
-    plt.legend(['Standard', 'Iden', 'Max'])
-    plt.yscale('log')
+    fig = plt.figure(1)
+    ax = fig.gca()
+    ll = np.linspace(0.0000000001,4,20)
+    ll = 10**ll
+    cs = ax.contour(x1v, x2v, hv,levels=ll)
+    plt.clabel(cs)
+    plt.axis('equal')
+    plt.plot([p[0] for p in path], [p[1] for p in path], marker='o', color='pink', markersize=10)
+    # RED: true minimum
+    plt.plot(x_true[0], x_true[1], marker='o', markersize=18, color='red')
+    # GREEN: starting point
+    plt.plot(path[0][0], path[0][1], marker='o', markersize=18, color='green')
+    plt.legend(['Path', 'Minimum', 'Start'])
     plt.show()
