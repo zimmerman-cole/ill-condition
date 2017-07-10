@@ -200,7 +200,6 @@ def compare_cg(plot=True):
     print('Avg time: %f' % cl_avg_time)
     print('Avg err: %f' % cl_avg_err)
 
-
 def visual_IR(start_x=0.0, start_y=0.0):
     A = util.psd_from_cond(cond_num=10000, n=2)
     x_true = 4 * np.random.randn(2)
@@ -248,5 +247,8 @@ def visual_IR(start_x=0.0, start_y=0.0):
     # GREEN: starting point
     plt.plot(path[0][0], path[0][1], marker='o', markersize=18, color='green')
     plt.legend(['Path', 'Minimum', 'Start'])
+<<<<<<< ac65a90ecae19a13c3456054af01eda929290720
 
+=======
+>>>>>>> Dumping visual_IR() into misc
     plt.show()
