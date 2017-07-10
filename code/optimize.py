@@ -67,7 +67,7 @@ class Solver:
         """
         self._check_ready()
         if x_0 is None:
-            x = np.random.randn(len(self.A))
+            x = np.zeros(len(self.A.T))
         else:
             x = np.copy(x_0)
 
@@ -81,6 +81,9 @@ class Solver:
 
     def _bare(*args, **kwargs):
         raise NotImplementedError('_bare not implemented?')
+
+    def path(*args, **kwargs):
+        print('path not implemented?')
 
     def test_methods(self):
         """
@@ -318,7 +321,7 @@ class GradientDescentSolver(Solver):
 
         assert len(self.A) == len(self.A.T) == len(self.b)
         if x_0 is None:
-            x = np.random.randn(len(self.A))
+            x = np.zeros(len(self.A.T))
         else:
             x = np.copy(x_0)
         # ======================================================================

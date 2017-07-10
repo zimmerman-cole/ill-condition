@@ -160,6 +160,32 @@ def visual_gd_bad_start():
     # ax.quiver(X_minor, Y_minor, U_minor, V_minor, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
     # ax.quiver(X_major, Y_major, U_major, V_major, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
     # ax.quiver(X_worst, Y_worst, U_worst, V_worst, angles='xy', scale_units='xy', scale=1, color=["red","blue"])
-    
+
     plt.draw()
+    plt.show()
+
+def visual_GD_CG_no_contour():
+    """
+    Visual GD and CG    WITHOUT CONTOURS.
+    """
+    A = util.psd_from_cond(cond_num=1000, n=n)
+    x_true = 4 * np.random.randn(n)
+    b = np.dot(A, x_true)
+
+    print('Initial resid err: %f' % norm_dif(np.zeros(n), A, b))
+
+    cgs = optimize.ConjugateGradientsSolver(A=A, b=b)
+    cg_path = cgs.path()
+    print('CG start: ' + str(cg_path[0]))
+
+    gds = optimize.GradientDescentSolver(A=A, b=b)
+    gd_path=gds.path()
+    print('GD start: ' + str(gd_path[0]))
+
+    plt.plot([x for (x,y) in cg_path], [y for (x,y) in cg_path], marker='o')
+    plt.plot([x for (x,y) in gd_path], [y for (x,y) in gd_path], marker='o')
+    plt.plot([x_true[0]], [x_true[1]], marker='x', markersize=18)
+
+    plt.legend(['CG', 'GD', 'x_true'])
+    plt.title('Paths of GD and CG')
     plt.show()
