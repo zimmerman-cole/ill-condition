@@ -87,6 +87,9 @@ class Solver:
         raise NotImplementedError('path not implemented?')
 
 
+    def path(*args, **kwargs):
+        print('path not implemented?')
+
     def test_methods(self):
         """
         Make sure _full, _bare and path give roughly the same x.
