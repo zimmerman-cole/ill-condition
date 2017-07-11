@@ -3,8 +3,11 @@ import numpy.linalg as la
 import matplotlib.pyplot as plt
 import optimize, visual
 
+# not positive-definite
 def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
     """
+    NOT POSITIVE-DEFINITE
+
     Generates an (m x n) matrix with the specified condition number. Use this
     to get a matrix with large (by most standards), decaying singular values.
 
@@ -18,8 +21,8 @@ def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
     Returns:
         Singular values of returned matrix will usually be large (depending
         on the supplied cond_num and min_sing, but usually the max >> 1).
-        If you leave min_sing==None, it returns a positive-definite matrix.
-        If min_sing < 0, it returns a negative-definite matrix. Singular value
+        If you leave min_sing==None, it returns a ____NOEP____ matrix.
+        If min_sing < 0, it returns a ____NOPE____ matrix. Singular value
         spectrum of returned matrix decreases roughly linearly (TODO: REPHRASE)
     """
     assert min(m,n) > 1
@@ -132,18 +135,6 @@ def ghetto_command_line():
             break
         except BaseException:
             traceback.print_exc()
-
-# Test if matrix is positive-definite
-def s_pos_def(A):
-    """
-    Returns True if A is positive-definite, False if not.
-
-    Tests that all of A's singular values are positive.
-
-    """
-    sing_vals = la.svd(A)[1]
-
-    return not any([i <= 0 for i in sing_vals])
 
 def plot_sing_vals(mats):
     """
