@@ -77,7 +77,7 @@ class Solver:
         raise NotImplementedError('_bare not implemented?')
 
     def path(*args, **kwargs):
-        print('path not implemented?')
+        raise NotImplementedError('path not implemented?')
 
     def test_methods(self):
         """
@@ -785,16 +785,17 @@ class IterativeRefinementSolver(Solver):
 class IterativeRefinementGeneralSolver(Solver):
 
     # OVERRIDES Solver CONSTRUCTOR
-    def __init__(self, A=None, b=None, full_output=False, **kwargs):
+    def __init__(self, A=None, b=None, full_output=False, \
+            intermediate_solver=None, intermediate_iter=100, \
+            intermediate_continuation=True):
         ## data input/output parameters
         self.A, self.b = A, b
         self.full_output = full_output
 
         ## intermediate solver parameters
-        if bool(kwargs) == True:
-            self.intermediate_solver = kwargs["intermediate_solver"]
-            self.intermediate_iter = kwargs["intermediate_iter"]
-            self.intermediate_continuation = kwargs["intermediate_continuation"]
+        self.intermediate_solver = kwargs["intermediate_solver"]
+        self.intermediate_iter = kwargs["intermediate_iter"]
+        self.intermediate_continuation = kwargs["intermediate_continuation"]
 
     def __str__(self):
         l1 = 'Iterative Refinement General Solver\n'
@@ -818,6 +819,16 @@ class IterativeRefinementGeneralSolver(Solver):
 
     def __repr__(self):
         return self.__str__()
+
+    def _check_ready(self):
+        if self.A is None or self.b is None:
+            raise AttributeError('A and/or b haven\'t been set yet.')
+        if len(self.A) != len(self.b):
+            raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
+
+        if self.intermediate_solver is None:
+            raise AttributeError('Please specify an intermediate solver.')
+        
 
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         if 'eps' not in kwargs:

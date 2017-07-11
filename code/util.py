@@ -136,9 +136,39 @@ def ghetto_command_line():
         except BaseException:
             traceback.print_exc()
 
-# TODO: GENERALIZE TO ALL SOLVERS
+# TODO: FIX POTENTIAL kwargs CONFLICT WHEN PASSING SOLVER-SPECIFIC PARAMS
 def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, **kwargs):
+    """
+    Gather info on how many iterations it takes to fully solve Ax=b depending
+        on A's size and condition number. A is always symmetric and
+        positive-definite.
 
+    Args:
+        (optimize.Solver)   solver: Chosen solver.
+        ([int])            n_range: Range of matrix sizes to test.
+        ([int])         cnum_range: Range of condition numbers to test.
+                          **kwargs: Solver-specific parameters.
+
+    Returns:
+        (dict)              results: Test results showing number of iterations
+                                        required for convergence.
+
+    More on 'results':
+        Each key in 'results' corresponds to a size, and each corresponding
+            value is a list of integers denoting the number of iterations until
+            convergence (each of which corresponds to a condition number in
+            cnum_range).
+
+    Example:
+    # Tests 9 total matrices (one 5x5 w/ cnum 10, one 5x5 w/ cnum 100 ...)
+    >>> results = iter_vs_cnum(solver = optimize.ConjugateGradientsSolver, \
+                    n_range = [5, 50, 500], cnum_range = [10, 100, 1000])
+
+    >>> results[50] # Show nums of iterations for (50 x 50) A w/ cnums 10,100,1000
+    [40, 55, 82]
+
+
+    """
 
     if n_range is None:
         n_range = range(50, 501, 50)
@@ -148,10 +178,10 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, **kwargs):
     n_mats = len(n_range) * len(cnum_range)
     print('Evaluating %d matrices' % n_mats)
 
-    sizes = dict()
+    results = dict()
 
     for n in n_range:
-        sizes[n] = []
+        results[n] = []
         plt.figure()
         plt.title('Size: %d by %d' % (n, n))
         for cond_num in cnum_range:
@@ -166,11 +196,11 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, **kwargs):
 
             solver = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=True, **kwargs)
             xopt, n_iter, resids, x_difs = solver.solve(x_true=x_true, max_iter = n*2)
-            sizes[n].append(n_iter)
+            results[n].append(n_iter)
 
 
             if verbose:
                 print('Final resid error: %f' % la.norm(b - np.dot(A, xopt)))
                 print('Took %d iter' % n_iter)
 
-    return sizes
+    return results
