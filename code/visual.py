@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as la
+import matplotlib, colorsys
 import matplotlib.pyplot as plt
 import util, optimize, sys
 
@@ -82,7 +83,7 @@ def visual_gd_bad_start():
     """
     Visualized gradient descent.
     """
-    A = util.psd_from_cond(cond_num=50,n=2)
+    A = psd_from_cond(cond_num=50,n=2)
     x_true = np.random.randn(2)
     b = np.dot(A,x_true)
     evals,evecs = la.eig(A)
@@ -189,3 +190,153 @@ def visual_GD_CG_no_contour():
     plt.legend(['CG', 'GD', 'x_true'])
     plt.title('Paths of GD and CG')
     plt.show()
+
+## ========================================================================== ##
+def gen_starts(A,x_true):
+    evals,evecs = la.eig(A)
+    cond_num = la.cond(A)
+
+    ## initialize random starting points
+    major_axis = evecs[np.argmax(abs(evals))]
+    major_axis[0],major_axis[1] = major_axis[1],major_axis[0]
+    minor_axis = evecs[np.argmin(abs(evals))]
+    minor_axis[0],minor_axis[1] = minor_axis[1],minor_axis[0]
+    worst_axis = max(evals)*major_axis + min(evals)*minor_axis
+
+    ## add noise to minor / major axes (to avoid one-step solutions)
+    start_minor = x_true+minor_axis/la.norm(minor_axis)*5+np.random.randn(2)
+    start_major = x_true+major_axis/la.norm(major_axis)*5+np.random.randn(2)*1/cond_num
+    start_worst = x_true+worst_axis/la.norm(worst_axis)*5
+
+    return start_minor, start_major, start_worst
+
+def calc_contours(A,b,span):
+    ## draw contours of 2*f(x) = 1/2*xAx - bx + c
+    num = 100
+    x1 = x2 = np.linspace(-span, span, num)
+    x1v, x2v = np.meshgrid(x1, x2, indexing='ij', sparse=False)
+    hv = np.zeros([num,num])
+    for i in range(len(x1)):
+        for j in range(len(x2)):
+            xx = np.array([x1v[i,j],x2v[i,j]])
+            hv[i,j] = np.dot(xx.T,np.dot(A,xx))-2*np.dot(b.T,xx)
+    return x1v, x2v, hv
+
+def plot_path(path, path_color):
+    plt.plot([p[0] for p in path], [p[1] for p in path], marker='o', markersize=0.5, color=path_color)
+    plt.plot(path[0][0], path[0][1], marker='x', markersize=15, color=path_color)
+
+def calc_errs(path,x_true):
+    x1_errs = [p[0] - x_true[0] for p in path]
+    x2_errs = [p[1] - x_true[1] for p in path]
+    errs = zip(x1_errs,x2_errs)
+    del errs[-1]
+
+    n_errs = [e/la.norm(e) for e in errs]
+
+    return x1_errs, x2_errs, errs, n_errs
+
+def plot_errs(name, errs, span, scheme=0, space="x"):
+    errs_x1, errs_x2 = [e[0] for e in errs], [e[1] for e in errs]
+
+    n = len(errs_x1)
+    HSV_tuples = [((x+scheme)*1.0/n, 0.5, 0.5) for x in range(n)]
+    RGB_tuples = map(lambda x: colorsys.hsv_to_rgb(*x), HSV_tuples)
+    colors = RGB_tuples
+    # colors = [matplotlib.colors.ColorConverter.to_rgba(str( (float(i)+1+scheme)/(n+1) )) for i in range(n)]
+    print(colors)
+    fig = plt.figure("errs: "+name)
+    ax = fig.gca()
+    origin = np.array([0,0])
+    for i in range(len(errs_x1)):
+        plt.quiver(0,0,errs_x1[i],errs_x2[i],color=colors[i], \
+                   scale=5,headaxislength=0,headlength=0,label=space+str(i))
+    e_span = span*1
+    ax.set_ylim([-e_span,e_span])
+    ax.set_xlim([-e_span,e_span])
+    plt.draw()
+    plt.legend()
+
+
+def vis_2x2(cond_num=None, solver=None):
+    if cond_num is None:
+        cond_num = 25
+    if solver is None:
+        print('enter `solver` type')
+        sys.exit()
+
+    ## setup problem data (posdef 2x2)
+    A = util.psd_from_cond(cond_num=cond_num,n=2)
+    x_true = np.random.randn(2)
+    b = np.dot(A,x_true)
+    evals,evecs = la.eig(A)
+
+    ## starting points
+    x_0_minor, x_0_major, x_0_worst = gen_starts(A,x_true)
+
+    ## solver object
+    s_name = eval("optimize."+solver)
+    s = s_name(A=A,b=b,full_output=True)
+
+    ## paths
+    path_minor = s.path(x_0=x_0_minor)
+    path_major = s.path(x_0=x_0_major)
+    path_worst = s.path(x_0=x_0_worst)
+
+    ## errors and residuals
+    x_opt_minor, i_minor, resids_minor, errs_minor = s.solve(x_0=x_0_minor, \
+                                                             x_true=x_true)
+    x_opt_major, i_major, resids_major, errs_major = s.solve(x_0=x_0_major, \
+                                                             x_true=x_true)
+    x_opt_worst, i_worst, resids_worst, errs_worst = s.solve(x_0=x_0_worst, \
+                                                             x_true=x_true)
+
+    ## plotting path ===========================================================
+    fig = plt.figure("path")
+    ax_path = plt.subplot(111)
+    span_minor = np.sqrt((path_minor[0][0] - x_opt_minor[0])**2 + (path_minor[0][1] - x_opt_minor[1])**2)
+    span_major = np.sqrt((path_major[0][0] - x_opt_major[0])**2 + (path_major[0][1] - x_opt_major[1])**2)
+    span_worst = np.sqrt((path_worst[0][0] - x_opt_worst[0])**2 + (path_worst[0][1] - x_opt_worst[1])**2)
+    span = 1.5*max(span_minor,span_major,span_worst)
+
+    x1v, x2v, ctrs = calc_contours(A=A,b=b,span=span)
+    ## plot path and contours
+    fig = plt.figure("path")
+    ax = fig.gca()
+    ll = np.linspace(10**-10,4,20)
+    ll = 10**ll
+    ll = [round(ll[i],0) for i in range(20)]
+    cs = ax.contour(x1v, x2v, ctrs,levels=ll)
+    plt.clabel(cs)
+    plt.xlabel("x1")
+    plt.ylabel("x2")
+    # plt.axis('equal')
+
+    plt.plot(x_true[0], x_true[1], marker='D', markersize=10) # TRUE POINT
+    plot_path(path=path_minor,path_color="blue")
+    plot_path(path=path_major,path_color="red")
+    plot_path(path=path_worst,path_color="green")
+
+    ## plotting errs ===========================================================
+    errs_minor_x1, errs_minor_x2, errs_minor, n_errs_minor = calc_errs(path_minor,x_true)
+    errs_major_x1, errs_major_x2, errs_major, n_errs_major = calc_errs(path_major,x_true)
+    errs_worst_x1, errs_worst_x2, errs_worst, n_errs_worst = calc_errs(path_worst,x_true)
+    n = len(errs_minor)
+    print(n)
+
+    plot_errs("minor", errs=n_errs_minor, span=span)
+    plot_errs("major", errs=n_errs_major, span=span)
+    plot_errs("worst", errs=n_errs_worst, span=span)
+
+    ## plotting transformed errs ===============================================
+    n_t_errs_minor = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_minor]
+    n_t_errs_major = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_major]
+    n_t_errs_worst = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_worst]
+
+    plot_errs("minor", errs=n_t_errs_minor, span=span, scheme=-0.25, space="Ax")
+    plot_errs("major", errs=n_t_errs_major, span=span, scheme=-0.25, space="Ax")
+    plot_errs("worst", errs=n_t_errs_worst, span=span, scheme=-0.25, space="Ax")
+
+    plt.draw()
+    plt.show()
+vis_2x2(cond_num=10,solver="ConjugateGradientsSolver")
