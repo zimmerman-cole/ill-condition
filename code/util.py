@@ -136,34 +136,10 @@ def ghetto_command_line():
         except BaseException:
             traceback.print_exc()
 
-def plot_sing_vals(mats):
-    """
-    Pass a matrix or list of matrices. Plots its (their) singular values on a
-    single plot.
-    """
-    if type(mats) == list:
-        for m in mats:
-            _, s, _ = la.svd(m)
-            plt.plot(s, marker='o')
-
-        plt.xlabel('Sing. val. #')
-        plt.ylabel('Sing val size')
-        plt.title('Singular values')
-        plt.legend([str(i) for i in range(len(mats))])
-        plt.show()
-
-    elif isinstance(mat, np.ndarray):
-        _, s, _ = la.svd(mats)
-        plt.plot(s, marker='o')
-        plt.xlabel('Sing. val. #')
-        plt.ylabel('Sing val size')
-        plt.title('Singular values')
-        plt.show()
-    else:
-        raise ValueError('Please pass a matrix or list of matrices.')
-
 # TODO: GENERALIZE TO ALL SOLVERS
-def iter_vs_cnum(n_range=None, cnum_range=None, verbose=0, plot=False):
+def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, **kwargs):
+
+
     if n_range is None:
         n_range = range(50, 501, 50)
     if cnum_range is None:
@@ -181,30 +157,20 @@ def iter_vs_cnum(n_range=None, cnum_range=None, verbose=0, plot=False):
         for cond_num in cnum_range:
             if verbose: print('n: %d    cnum: %d' % (n, cond_num))
 
-            A = util.psd_from_cond(cond_num=cond_num, n=n)
+            #A = util.psd_from_cond(cond_num=cond_num, n=n)
+            A = psd_from_cond(cond_num=cond_num, n=n)
             x_true = 4 * np.random.randn(n)
             b = np.dot(A, x_true)
 
-            if verbose: print('Initial resid error: %f' % norm_dif(np.zeros(n), A, b))
+            if verbose: print('Initial resid error: %f' % la.norm(b))
 
-            cg_solver = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=True)
-            xopt, n_iter, resids, x_difs = cg_solver.solve(x_true=x_true, max_iter = n*2)
+            solver = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=True, **kwargs)
+            xopt, n_iter, resids, x_difs = solver.solve(x_true=x_true, max_iter = n*2)
             sizes[n].append(n_iter)
 
 
             if verbose:
-                print('Final resid error: %f' % norm_dif(xopt, A, b))
+                print('Final resid error: %f' % la.norm(b - np.dot(A, xopt)))
                 print('Took %d iter' % n_iter)
-
-        if plot:
-            plt.plot(cnum_range, sizes[n], marker='o')
-            plt.plot(cnum_range, [n for _ in cnum_range])
-            plt.ylabel('Number of iterations taken')
-            plt.xlabel('Condition number of A')
-            plt.xscale, plt.yscale = 'log', 'log'
-
-
-    if plot:
-        plt.show()
 
     return sizes

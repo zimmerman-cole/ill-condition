@@ -16,12 +16,6 @@ class Solver:
         self.A, self.b = A, b
         self.full_output = full_output
 
-        ## intermediate solver parameters (for IR solvers)
-        if bool(kwargs) == True:
-            self.intermediate_solver = kwargs["intermediate_solver"]
-            self.intermediate_iter = kwargs["intermediate_iter"]
-            self.intermediate_continuation = kwargs["intermediate_continuation"]
-
     def _check_ready(self):
         """
         Check everything's in place to start optimization. DOES NOT
@@ -789,6 +783,18 @@ class IterativeRefinementSolver(Solver):
         return path
 
 class IterativeRefinementGeneralSolver(Solver):
+
+    # OVERRIDES Solver CONSTRUCTOR
+    def __init__(self, A=None, b=None, full_output=False, **kwargs):
+        ## data input/output parameters
+        self.A, self.b = A, b
+        self.full_output = full_output
+
+        ## intermediate solver parameters
+        if bool(kwargs) == True:
+            self.intermediate_solver = kwargs["intermediate_solver"]
+            self.intermediate_iter = kwargs["intermediate_iter"]
+            self.intermediate_continuation = kwargs["intermediate_continuation"]
 
     def __str__(self):
         l1 = 'Iterative Refinement General Solver\n'
