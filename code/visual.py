@@ -2,7 +2,9 @@ import numpy as np
 import numpy.linalg as la
 import matplotlib, colorsys
 import matplotlib.pyplot as plt
-import util, optimize, sys
+import util, optimize, sys, pprint
+import scipy.linalg as sla
+from mpl_toolkits.mplot3d import Axes3D
 
 def norm_dif(x, *args):
     """
@@ -353,9 +355,139 @@ def vis_2x2(cond_num=None, solver=None, addl_plot=None):
     ## takeaway ================================================================
 
 if __name__ == "__main__":
+
     # vis_2x2(cond_num=10,solver="ConjugateGradientsSolver",addl_plot=True)
     vis_2x2(cond_num=30,solver="GradientDescentSolver", addl_plot=False)
-
-
     plt.draw()
+    plt.show()
+
+
+
+## =============================================================================
+## DEBUGGING
+## =============================================================================
+
+## debugging GD 2x2 ============================================================
+
+def gen_starts_debug(A,x_true,n_scale):
+    evals,evecs = la.eig(A)
+    cond_num = float(la.cond(A))
+    n = len(A)
+    print(cond_num)
+    print(evecs)
+    print(evals)
+
+    ## initialize random starting points
+    major_axis = evecs[np.argmax(abs(evals))]
+    major_axis[0],major_axis[1] = major_axis[1],major_axis[0]
+    minor_axis = evecs[np.argmin(abs(evals))]
+    minor_axis[0],minor_axis[1] = minor_axis[1],minor_axis[0]
+    worst_axis = max(evals)*major_axis + min(evals)*minor_axis
+
+    ## add noise to minor / major axes (to avoid one-step solutions)
+    start_minor = x_true+minor_axis/la.norm(minor_axis)*5+np.random.randn(n)
+    start_major_noiseless = x_true+major_axis/la.norm(major_axis)
+    start_major_noisey = np.copy(start_major_noiseless) + np.random.randn(n)/n_scale
+    start_worst = x_true+worst_axis/la.norm(worst_axis)*5
+    # print("start_minor: %s" % start_minor)
+    print("start_major_noisey: %s" % start_major_noisey)
+    print("start_major_noiseless: %s" % start_major_noiseless)
+
+    return start_major_noisey, start_major_noiseless
+
+def gd_debug():
+    cond_num = float(100)
+    n = 2
+    n_sims = 5
+    n_scale = np.linspace(1,3*cond_num,n_sims)
+
+    fig = plt.figure("resids")
+    for scale in n_scale:
+        c = matplotlib.colors.to_rgba(str( (scale+1)/(3*cond_num+1) ))
+
+        ## setup problem data (posdef 2x2)
+        A = util.psd_from_cond(cond_num=cond_num,n=n)
+        pprint.pprint(A)
+        print()
+        x_true = np.random.randn(n)
+        b = np.dot(A,x_true)
+        evals,evecs = la.eig(A)
+
+        ## starting points
+        x_0_noisey, x_0_noiseless = gen_starts_debug(A,x_true,n_scale=scale)
+
+        ## solve
+        gds = optimize.GradientDescentSolver(A=A,b=b,full_output=True)
+        x_opt_noisey, i_noisey, resids_noisey, errs_noisey = \
+                        gds.solve(x_0=x_0_noisey, x_true=x_true)
+        x_opt_noiseless, i_noiseless, resids_noiseless, errs_noiseless = \
+                        gds.solve(x_0=x_0_noiseless, x_true=x_true)
+
+        print("max resid noisey: %s in %s steps" % (max(resids_noisey)[0], i_noisey))
+        print("max resid noiseless: %s in %s steps" % (max(resids_noiseless)[0], i_noiseless))
+
+        plt.plot([r[0] for r in resids_noisey], label=round(scale,2),color=c)
+    plt.yscale('log')
+    plt.legend(loc=2,prop={'size':5})
+    plt.show()
+
+## 3d paths ====================================================================
+
+
+def gd_3d():
+    cond_num = 5
+    n = 3
+    scale = 10
+    c = matplotlib.colors.to_rgba(str( (scale+1)/(3*cond_num+1) ))
+
+    ## setup problem data (posdef 2x2)
+    A = util.psd_from_cond(cond_num=cond_num,n=n)
+    pprint.pprint(A)
+    x_true = np.random.randn(n)
+    b = np.dot(A,x_true)
+    evals,evecs = la.eig(A)
+
+    ## starting points
+    x_0_noisey, x_0_noiseless = gen_starts_debug(A,x_true,n_scale=scale)
+
+    ## solve
+    gds = optimize.GradientDescentSolver(A=A,b=b,full_output=True)
+    x_opt_noisey, i_noisey, resids_noisey, errs_noisey = \
+                    gds.solve(x_0=x_0_noisey, x_true=x_true)
+    x_opt_noiseless, i_noiseless, resids_noiseless, errs_noiseless = \
+                    gds.solve(x_0=x_0_noiseless, x_true=x_true)
+
+    path_noisey = gds.path(x_0=x_0_noisey)
+    path_noiseless = gds.path(x_0=x_0_noiseless)
+
+    print("max resid noisey: %s in %s steps" % (max(resids_noisey)[0], i_noisey))
+    print("max resid noiseless: %s in %s steps" % (max(resids_noiseless)[0], i_noiseless))
+
+    cgs = optimize.ConjugateGradientsSolver(A=A,b=b,full_output=True)
+    path_cg_noisey = cgs.path(x_0=x_0_noisey)
+    path_cg_noiseless = cgs.path(x_0=x_0_noiseless)
+
+    matplotlib.rcParams['legend.fontsize'] = 10
+
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    x_noisey = [p[0] for p in path_noisey]
+    y_noisey = [p[1] for p in path_noisey]
+    z_noisey = [p[2] for p in path_noisey]
+    x_noiseless = [p[0] for p in path_noiseless]
+    y_noiseless = [p[1] for p in path_noiseless]
+    z_noiseless = [p[2] for p in path_noiseless]
+    x_cg_noiseless = [p[0] for p in path_cg_noiseless]
+    y_cg_noiseless = [p[1] for p in path_cg_noiseless]
+    z_cg_noiseless = [p[2] for p in path_cg_noiseless]
+    x_cg_noisey = [p[0] for p in path_cg_noisey]
+    y_cg_noisey = [p[1] for p in path_cg_noisey]
+    z_cg_noisey = [p[2] for p in path_cg_noisey]
+
+    ax.plot(x_noisey, y_noisey, z_noisey, label='noisey', marker='X', markersize = 10)
+    ax.plot(x_noisey, y_noisey, z_noisey, label='noiseless', marker='o')
+    ax.plot(x_cg_noisey, y_cg_noisey, z_cg_noisey, label='cg noisey', marker='o')
+    ax.plot(x_cg_noiseless, y_cg_noiseless, z_cg_noiseless, label='cg noiseless', marker='o')
+    ax.legend()
+
     plt.show()
