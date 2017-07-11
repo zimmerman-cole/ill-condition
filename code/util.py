@@ -180,7 +180,6 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, \
 
 
     """
-
     if n_range is None:
         n_range = range(50, 501, 50)
     if cnum_range is None:
@@ -208,11 +207,11 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, \
 
             if verbose: print('Initial resid error: %f' % la.norm(b))
 
+
             solver_.A, solver_.b = A, b
             xopt, n_iter, resids, x_difs = solver_.solve(x_true=x_true, max_iter = n*2, \
                                                             **solve_args)
             results[n].append(n_iter)
-
 
             if verbose:
                 print('Final resid error: %f' % la.norm(b - np.dot(A, xopt)))

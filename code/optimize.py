@@ -23,6 +23,7 @@ class Solver:
             print('Ignoring them and continuing anyways')
             print('===================================================')
 
+
     def _check_ready(self):
         """
         Check everything's in place to start optimization. DOES NOT
@@ -790,6 +791,7 @@ class IterativeRefinementGeneralSolver(Solver):
     def __init__(self, A=None, b=None, full_output=False, \
             intermediate_solver=None, intermediate_iter=100, \
             intermediate_continuation=True):
+
         ## data input/output parameters
         self.A, self.b = A, b
         self.full_output = full_output
@@ -798,6 +800,7 @@ class IterativeRefinementGeneralSolver(Solver):
         self.intermediate_solver = intermediate_solver
         self.intermediate_iter = intermediate_iter
         self.intermediate_continuation = intermediate_continuation
+
 
     def __str__(self):
         l1 = 'Iterative Refinement General Solver\n'
