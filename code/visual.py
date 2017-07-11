@@ -194,7 +194,8 @@ def visual_GD_CG_no_contour():
 ## ========================================================================== ##
 def gen_starts(A,x_true):
     evals,evecs = la.eig(A)
-    cond_num = la.cond(A)
+    cond_num = float(la.cond(A))
+    print(cond_num)
 
     ## initialize random starting points
     major_axis = evecs[np.argmax(abs(evals))]
@@ -205,9 +206,11 @@ def gen_starts(A,x_true):
 
     ## add noise to minor / major axes (to avoid one-step solutions)
     start_minor = x_true+minor_axis/la.norm(minor_axis)*5+np.random.randn(2)
-    start_major = x_true+major_axis/la.norm(major_axis)*5+np.random.randn(2)*1/cond_num
+    start_major = x_true+major_axis/la.norm(major_axis)*5+np.random.randn(2)/cond_num
     start_worst = x_true+worst_axis/la.norm(worst_axis)*5
-
+    # print("start_minor: %s" % start_minor)
+    # print("start_major: %s" % start_major)
+    # print("start_worst: %s" % start_worst)
     return start_minor, start_major, start_worst
 
 def calc_contours(A,b,span):
@@ -231,9 +234,7 @@ def calc_errs(path,x_true):
     x2_errs = [p[1] - x_true[1] for p in path]
     errs = zip(x1_errs,x2_errs)
     del errs[-1]
-
     n_errs = [e/la.norm(e) for e in errs]
-
     return x1_errs, x2_errs, errs, n_errs
 
 def plot_errs(name, errs, span, scheme=0, space="x"):
@@ -243,8 +244,6 @@ def plot_errs(name, errs, span, scheme=0, space="x"):
     HSV_tuples = [((x+scheme)*1.0/n, 0.5, 0.5) for x in range(n)]
     RGB_tuples = map(lambda x: colorsys.hsv_to_rgb(*x), HSV_tuples)
     colors = RGB_tuples
-    # colors = [matplotlib.colors.ColorConverter.to_rgba(str( (float(i)+1+scheme)/(n+1) )) for i in range(n)]
-    print(colors)
     fig = plt.figure("errs: "+name)
     ax = fig.gca()
     origin = np.array([0,0])
@@ -254,11 +253,15 @@ def plot_errs(name, errs, span, scheme=0, space="x"):
     e_span = span*1
     ax.set_ylim([-e_span,e_span])
     ax.set_xlim([-e_span,e_span])
+    ip = [np.dot(errs[i],errs[i+1]) for i in range(len(errs)-1)]
+
+    ip = ip[0]
+    ax.text(-e_span,e_span-4*scheme,"inner product in "+space+"space: "+str(ip))
     plt.draw()
     plt.legend()
 
 
-def vis_2x2(cond_num=None, solver=None):
+def vis_2x2(cond_num=None, solver=None, addl_plot=None):
     if cond_num is None:
         cond_num = 25
     if solver is None:
@@ -291,6 +294,11 @@ def vis_2x2(cond_num=None, solver=None):
     x_opt_worst, i_worst, resids_worst, errs_worst = s.solve(x_0=x_0_worst, \
                                                              x_true=x_true)
 
+    # print(path_major)
+    # print(resids_major)
+    print(errs_major)
+
+
     ## plotting path ===========================================================
     fig = plt.figure("path")
     ax_path = plt.subplot(111)
@@ -317,26 +325,31 @@ def vis_2x2(cond_num=None, solver=None):
     plot_path(path=path_major,path_color="red")
     plot_path(path=path_worst,path_color="green")
 
-    ## plotting errs ===========================================================
-    errs_minor_x1, errs_minor_x2, errs_minor, n_errs_minor = calc_errs(path_minor,x_true)
-    errs_major_x1, errs_major_x2, errs_major, n_errs_major = calc_errs(path_major,x_true)
-    errs_worst_x1, errs_worst_x2, errs_worst, n_errs_worst = calc_errs(path_worst,x_true)
-    n = len(errs_minor)
-    print(n)
+    if addl_plot:
+        ## plotting errs ===========================================================
+        errs_minor_x1, errs_minor_x2, errs_minor, n_errs_minor = calc_errs(path_minor,x_true)
+        errs_major_x1, errs_major_x2, errs_major, n_errs_major = calc_errs(path_major,x_true)
+        errs_worst_x1, errs_worst_x2, errs_worst, n_errs_worst = calc_errs(path_worst,x_true)
+        n = len(errs_minor)
 
-    plot_errs("minor", errs=n_errs_minor, span=span)
-    plot_errs("major", errs=n_errs_major, span=span)
-    plot_errs("worst", errs=n_errs_worst, span=span)
+        plot_errs("minor", errs=n_errs_minor, span=span)
+        plot_errs("major", errs=n_errs_major, span=span)
+        plot_errs("worst", errs=n_errs_worst, span=span)
 
-    ## plotting transformed errs ===============================================
-    n_t_errs_minor = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_minor]
-    n_t_errs_major = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_major]
-    n_t_errs_worst = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_worst]
+        ## plotting transformed errs ===============================================
+        n_t_errs_minor = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_minor]
+        n_t_errs_major = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_major]
+        n_t_errs_worst = [np.dot(A,e)/la.norm(np.dot(A,e)) for e in errs_worst]
 
-    plot_errs("minor", errs=n_t_errs_minor, span=span, scheme=-0.25, space="Ax")
-    plot_errs("major", errs=n_t_errs_major, span=span, scheme=-0.25, space="Ax")
-    plot_errs("worst", errs=n_t_errs_worst, span=span, scheme=-0.25, space="Ax")
+        plot_errs("minor", errs=n_t_errs_minor, span=span, scheme=-0.25, space="Ax")
+        plot_errs("major", errs=n_t_errs_major, span=span, scheme=-0.25, space="Ax")
+        plot_errs("worst", errs=n_t_errs_worst, span=span, scheme=-0.25, space="Ax")
 
     plt.draw()
     plt.show()
-vis_2x2(cond_num=10,solver="ConjugateGradientsSolver")
+    ## takeaway ================================================================
+    ## CG errors are orthogonal in the transformed A space
+    ## CG residuals are orthogonal (implied by the above statement)
+    ## takeaway ================================================================
+# vis_2x2(cond_num=10,solver="ConjugateGradientsSolver",addl_plot=True)
+vis_2x2(cond_num=30,solver="GradientDescentSolver", addl_plot=False)
