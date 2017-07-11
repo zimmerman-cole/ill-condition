@@ -164,7 +164,6 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, \
             cnum_range).
 
     Example:
-
     >>> solve_params = {'tol': 0.1}
     >>> construct_params = {'intermediate_solver': optimize.DirectInverseSolver}
 

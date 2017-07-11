@@ -89,7 +89,7 @@ class Solver:
 
 
     def path(*args, **kwargs):
-        print('path not implemented?')
+        raise NotImplementedError('path not implemented?')
 
     def test_methods(self):
         """
@@ -833,7 +833,6 @@ class IterativeRefinementGeneralSolver(Solver):
 
         if self.intermediate_solver is None:
             raise AttributeError('Please specify an intermediate solver.')
-
 
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         if 'eps' not in kwargs:
