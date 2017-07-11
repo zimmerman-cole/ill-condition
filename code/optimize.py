@@ -16,6 +16,13 @@ class Solver:
         self.A, self.b = A, b
         self.full_output = full_output
 
+        if bool(kwargs):
+            print('=============== ??? ===============================')
+            print('Solver constructor received unexpected arguments:')
+            print(kwargs)
+            print('Ignoring them and continuing anyways')
+            print('===================================================')
+
     def _check_ready(self):
         """
         Check everything's in place to start optimization. DOES NOT
@@ -662,15 +669,6 @@ class PreconditionedCGSolver(Solver):
             return x, i, residuals, x_difs
 
 
-
-
-
-
-
-
-
-
-
 # TODO: add parameter governing epsilon's decay rate
 class IterativeRefinementSolver(Solver):
     """
@@ -794,9 +792,9 @@ class IterativeRefinementGeneralSolver(Solver):
         self.full_output = full_output
 
         ## intermediate solver parameters
-        self.intermediate_solver = kwargs["intermediate_solver"]
-        self.intermediate_iter = kwargs["intermediate_iter"]
-        self.intermediate_continuation = kwargs["intermediate_continuation"]
+        self.intermediate_solver = intermediate_solver
+        self.intermediate_iter = intermediate_iter
+        self.intermediate_continuation = intermediate_continuation
 
     def __str__(self):
         l1 = 'Iterative Refinement General Solver\n'

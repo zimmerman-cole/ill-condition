@@ -137,17 +137,22 @@ def ghetto_command_line():
             traceback.print_exc()
 
 # TODO: FIX POTENTIAL kwargs CONFLICT WHEN PASSING SOLVER-SPECIFIC PARAMS
-def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, **kwargs):
+def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, \
+            construct_args=dict(), solve_args=dict() ):
     """
     Gather info on how many iterations it takes to fully solve Ax=b depending
         on A's size and condition number. A is always symmetric and
         positive-definite.
 
     Args:
-        (optimize.Solver)   solver: Chosen solver.
+        (optimize.Solver)   solver: Chosen solver class (NOT an instance of it).
         ([int])            n_range: Range of matrix sizes to test.
         ([int])         cnum_range: Range of condition numbers to test.
-                          **kwargs: Solver-specific parameters.
+        (dict)      construct_args: Solver-specific CONSTRUCTOR parameters.
+                                    (i.e. for IR General Solver, have to pass
+                                    'intermediate_solver', 'intermediate_iter' ...)
+        (dict)          solve_args: Solver-specific parameters to be passed to
+                                    solver.solve(). (i.e. 'tol', 'eps' for IR ...)
 
     Returns:
         (dict)              results: Test results showing number of iterations
@@ -160,9 +165,16 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, **kwargs):
             cnum_range).
 
     Example:
+
+    >>> solve_params = {'tol': 0.1}
+    >>> construct_params = {'intermediate_solver': optimize.DirectInverseSolver}
+
     # Tests 9 total matrices (one 5x5 w/ cnum 10, one 5x5 w/ cnum 100 ...)
-    >>> results = iter_vs_cnum(solver = optimize.ConjugateGradientsSolver, \
-                    n_range = [5, 50, 500], cnum_range = [10, 100, 1000])
+    >>> results = iter_vs_cnum(solver = optimize.IterativeRefinementGeneralSolver, \
+                    n_range = [5, 50, 500, 5000], cnum_range = [10, 100, 1000], \
+                    construct_args = construct_params, solve_args = solve_params)
+    # 'results' is a dictionary of length 4 (for each size), and each value is a
+    # list of length 3 (for each condition number)
 
     >>> results[50] # Show nums of iterations for (50 x 50) A w/ cnums 10,100,1000
     [40, 55, 82]
@@ -180,6 +192,9 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, **kwargs):
 
     results = dict()
 
+    # Construct solver instance
+    solver_ = solver(A=None, b=None, full_output=1, **construct_args)
+
     for n in n_range:
         results[n] = []
         plt.figure()
@@ -194,8 +209,9 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, **kwargs):
 
             if verbose: print('Initial resid error: %f' % la.norm(b))
 
-            solver = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=True, **kwargs)
-            xopt, n_iter, resids, x_difs = solver.solve(x_true=x_true, max_iter = n*2)
+            solver_.A, solver_.b = A, b
+            xopt, n_iter, resids, x_difs = solver_.solve(x_true=x_true, max_iter = n*2, \
+                                                            **solve_args)
             results[n].append(n_iter)
 
 
