@@ -412,6 +412,9 @@ class ConjugateGradientsSolver(Solver):
         rTr = np.dot(r.T, r)
         i = 1
         d = np.copy(r)  # First search direction is just the residual
+
+        #ds, rs = [d], [r]   # DEBUG
+
         Ad = np.dot(self.A, d)
         a = rTr / np.dot(d.T, Ad)
         x += a * d
@@ -440,6 +443,10 @@ class ConjugateGradientsSolver(Solver):
             beta = new_rTr / rTr
 
             d = new_r + beta * d
+
+            #ds.append(d)            # DEBUG
+            #rs.append(new_r)
+
             r, rTr = new_r, new_rTr
             Ad = np.dot(self.A, d)
 
@@ -449,6 +456,7 @@ class ConjugateGradientsSolver(Solver):
 
         if x_true is None:
             return x, i, residuals
+            #return x, i, residuals, ds, rs  # DEBUG
         else:
             return x, i, residuals, x_difs
 

@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
-import optimize, visual
+import optimize, visual, traceback, sys
 
 # not positive-definite
 def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
@@ -161,3 +161,50 @@ def plot_sing_vals(mats):
         plt.show()
     else:
         raise ValueError('Please pass a matrix or list of matrices.')
+
+# TODO: GENERALIZE TO ALL SOLVERS
+def iter_vs_cnum(n_range=None, cnum_range=None, verbose=0, plot=False):
+    if n_range is None:
+        n_range = range(50, 501, 50)
+    if cnum_range is None:
+        cnum_range = [10**i for i in range(1,10)]
+
+    n_mats = len(n_range) * len(cnum_range)
+    print('Evaluating %d matrices' % n_mats)
+
+    sizes = dict()
+
+    for n in n_range:
+        sizes[n] = []
+        plt.figure()
+        plt.title('Size: %d by %d' % (n, n))
+        for cond_num in cnum_range:
+            if verbose: print('n: %d    cnum: %d' % (n, cond_num))
+
+            A = util.psd_from_cond(cond_num=cond_num, n=n)
+            x_true = 4 * np.random.randn(n)
+            b = np.dot(A, x_true)
+
+            if verbose: print('Initial resid error: %f' % norm_dif(np.zeros(n), A, b))
+
+            cg_solver = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=True)
+            xopt, n_iter, resids, x_difs = cg_solver.solve(x_true=x_true, max_iter = n*2)
+            sizes[n].append(n_iter)
+
+
+            if verbose:
+                print('Final resid error: %f' % norm_dif(xopt, A, b))
+                print('Took %d iter' % n_iter)
+
+        if plot:
+            plt.plot(cnum_range, sizes[n], marker='o')
+            plt.plot(cnum_range, [n for _ in cnum_range])
+            plt.ylabel('Number of iterations taken')
+            plt.xlabel('Condition number of A')
+            plt.xscale, plt.yscale = 'log', 'log'
+
+
+    if plot:
+        plt.show()
+
+    return sizes

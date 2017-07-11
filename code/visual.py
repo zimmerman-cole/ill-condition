@@ -351,5 +351,7 @@ def vis_2x2(cond_num=None, solver=None, addl_plot=None):
     ## CG errors are orthogonal in the transformed A space
     ## CG residuals are orthogonal (implied by the above statement)
     ## takeaway ================================================================
-# vis_2x2(cond_num=10,solver="ConjugateGradientsSolver",addl_plot=True)
-vis_2x2(cond_num=30,solver="GradientDescentSolver", addl_plot=False)
+
+if __name__ == "__main__":
+    # vis_2x2(cond_num=10,solver="ConjugateGradientsSolver",addl_plot=True)
+    vis_2x2(cond_num=30,solver="GradientDescentSolver", addl_plot=False)
