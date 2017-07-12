@@ -1158,6 +1158,11 @@ class IterativeRefinementGeneralSolver(Solver):
             eps = 2 * la.norm(self.A)
         else:
             eps = float(kwargs['eps'])
+        if 'decay_rate' not in kwargs:
+            decay_rate = 0.5
+        else:
+            decay_rate = float(kwargs['decay_rate'])
+
 
         start_time = time.time()
         residuals = []
@@ -1178,7 +1183,7 @@ class IterativeRefinementGeneralSolver(Solver):
             i += 1
 
             if self.intermediate_continuation == True:
-                eps *= 0.5
+                eps *= decay_rate
             A_e = self.A + eps * np.identity(len(self.A))
 
             ## call intermediate solver method
