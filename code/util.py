@@ -41,7 +41,7 @@ def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
     # Sparse? instead of np.diag(s)
     return np.dot(u, np.dot(np.diag(s), v))
 
-def decaying_psd(cond_num, n=50, min_sing=None):
+def decaying_spd(cond_num, n=50, min_sing=None):
     """
     Gives a symmetric, positive-definite matrix with a 'bad' singular value
     spectrum shape (rapidly decaying values).
@@ -52,7 +52,7 @@ def decaying_psd(cond_num, n=50, min_sing=None):
         raise la.linAlgError('Condition number must be greater than or equal to 1')
     if min_sing is None:
         min_sing = abs(np.random.randn())
-    max_sing = min_sing * float(cond_num)
+    max_sing = min_sing * float(np.sqrt(cond_num))
     # =======================
 
     s = [max_sing] + [max_sing*(1.0/i) for i in range(1,n-1)] + [min_sing]
@@ -63,8 +63,56 @@ def decaying_psd(cond_num, n=50, min_sing=None):
     A = np.random.randn(n, n)
     u,_,v = la.svd(A, full_matrices=False)
 
+    B = np.dot(u, np.dot(np.diag(sorted(s)), v))
     # Sparse? instead of np.diag(s)
-    return np.dot(u, np.dot(np.diag(sorted(s)), v))
+    return np.dot(B.T,B)
+
+def hanging_spd(cond_num, n=50, pct_good=0.80, drop=0.90, min_sing=None):
+    """
+    Gives a symmetric, positive-definite matrix (SPD) with a 'good' singular value
+    spectrum shape ('pct_good' slowly decaying values before a sharp drop off).
+    """
+    # =======================
+    assert n > 1
+    if cond_num < 1:
+        raise la.linAlgError('Condition number must be greater than or equal to 1')
+    if min_sing is None:
+        min_sing = abs(np.random.randn())
+    max_sing = min_sing * float(np.sqrt(cond_num))
+
+    # =======================
+
+    n_good = round(pct_good*n,0)
+    n_bad = n - n_good
+    # print(n_good)
+    # print(n_bad)
+    good = np.linspace(max_sing,drop*max_sing,n_good)
+    if n_bad == 1:
+        bad = [min_sing]
+    else:
+        bad = np.linspace(min_sing/drop,min_sing,n_bad)
+    s = sorted(np.append(good,bad))
+
+    for i in range(1, len(s)-1):
+        # print(i)
+        # add some noise to the values
+        if i<= n_good:
+            noise = ((1-drop)) * np.random.randn()
+            s[i] = max(min(max_sing, s[i] + noise),min_sing)
+            # print(s[i])
+        else:
+            noise = ((1-drop) * min_sing) *np.random.randn()
+            s[i] = min(max(min_sing,abs(s[i] + noise)),max_sing)
+
+    A = np.random.randn(n, n)
+    u,_,v = la.svd(A, full_matrices=False)
+    # print(s)
+    # print(max_sing)
+    # print(min_sing)
+    B = np.dot(u, np.dot(np.diag(s), v))
+    # Sparse? instead of np.diag(s)
+    return np.dot(B.T,B)
+
 
 def small_sing_vals(cond_num, m=50, n=50, max_sing=0.8):
     """
