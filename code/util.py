@@ -265,3 +265,13 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, \
                 print('Took %d iter' % n_iter)
 
     return results
+
+def gen_data(n=100, cond_num=100):
+    """
+    Returns SPD matrix A, solution x_true and RHS b (in Ax=b).
+    """
+    A = psd_from_cond(cond_num=cond_num, n=n)
+    x_true = 4 * np.random.randn(n)
+    b = np.dot(A, x_true)
+
+    return A, b, x_true

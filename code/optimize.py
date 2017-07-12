@@ -673,6 +673,7 @@ class PreconditionedCGSolver(Solver):
         else:
             return x, i, residuals, x_difs
 
+# Use AltPreCGSolver instead
 class TransPreCGSolver(Solver):
     """
     Transformed Preconditioned Conjugate Gradient Method (from
@@ -680,6 +681,8 @@ class TransPreCGSolver(Solver):
 
     Requires a symmetric positive-definite matrix M that approximates A but is
         'easier to invert' (Cholesky decompose?).
+
+    Use AltPreCGSolver instead.
     """
 
     def __init__(self, A, b, M, full_output=False):
@@ -766,22 +769,33 @@ class AltPreCGSolver(Solver):
     Untransformed Preconditioned Conjugate Gradient Method,
         from painless-conjugate-gradient (pg 40).
 
-    TODO:
-        -Make process of applying preconditioner more efficient
-            (i.e. for diagonals, don't call la.inv, just 1/diag)
+
+    For this method to be maximally efficient, you must hardcode the
+        way M's information should be stored in a method called
+        _store_M(self, M).
+    The most efficient way of multiplying a vector by M^-1 (using the info
+        stored above) must also be hardcoded into a method called _Minv(self, x)
+        for this solver to be maximally efficient.
     """
 
     def __init__(self, A, b, M, full_output=False):
         self.A, self.b = A, b
         self.full_output = full_output
-        self.M = M
-        self.Minv = la.inv(self.M)
+        self._store_M(M)
 
-    def _Minv(self, x):
+    # DIAGONAL =================================================================
+    def _store_M(self, M):
         """
-        FOR DIAGONAL PRECONDITIONERS M (i.e. Jacobi)
+        M is diagonal; store 1/elem for each diagonal element.
         """
-        pass
+        self.Minv = np.array([1.0/i for i in np.diag(M)])
+
+    def _mult(self, x):
+        """
+        Returns dot(M^-1, x) for diagonal M.
+        """
+        return np.multiply(x, self.Minv) # elementwise multiply
+    # /DIAGONAL ================================================================
 
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         if 'recalc' not in kwargs:
@@ -805,9 +819,10 @@ class AltPreCGSolver(Solver):
                 return x, 0, residuals, x_difs
 
         i = 1
-        d = np.dot(self.Minv, r)
+        d = self._mult(r)    # d = dot(M^-1, r)
 
-        rTMr = np.dot(r.T, np.dot(self.Minv, r))
+        # rTMr = np.dot(r.T, self.mult(r))
+        rTMr = np.dot(r.T, d)   # max ef
         Ad = np.dot(self.A, d)
 
         a = rTMr / np.dot(d.T, Ad)
@@ -831,10 +846,12 @@ class AltPreCGSolver(Solver):
 
             i += 1
 
-            new_rTMr = np.dot(new_r.T, np.dot(self.Minv, new_r))
+            M_new_r = self._mult(new_r)
+            #new_rTMr = np.dot(new_r.T, np.dot(self.Minv, new_r))
+            new_rTMr = np.dot(new_r.T, M_new_r)
             B = new_rTMr / rTMr
 
-            d = np.dot(self.Minv, new_r) + B * d
+            d = M_new_r + B * d
 
             r, rTMr = new_r, new_rTMr
             Ad = np.dot(self.A, d)

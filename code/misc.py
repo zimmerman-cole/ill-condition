@@ -249,3 +249,56 @@ def visual_IR(start_x=0.0, start_y=0.0):
     plt.legend(['Path', 'Minimum', 'Start'])
 
     plt.show()
+
+def preconditioned_cg():
+    A, b, x_true = util.gen_data(n=1000, cond_num=10**5)
+    M = np.diag(np.diag(A))
+    print('TRANSFORMED CNUM: %f' % la.cond(np.dot(la.inv(M), A)))
+
+    print('Init resid error: %f\n' % la.norm(b))
+
+    # REGULAR ======================================
+
+    st_time = time.time()
+    cg = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=1)
+    xopt, n_iter_r, r_resids, r_x_difs = cg.solve(x_true=x_true)
+    cg_time = time.time() - st_time
+    print('CG final resid err: %f (%d iter)' % (norm_dif(xopt, A, b), n_iter_r))
+    print('CG time: %f\n' % cg_time)
+
+    plt.figure(0)
+    plt.plot([t for (n,t) in r_resids], [n for (n,t) in r_resids], marker='o')
+    plt.figure(1)
+    plt.plot([t for (n,t) in r_resids], r_x_difs, marker='o')
+
+    # UNTRANSFORMED PRECONDITIONED ==================
+    st_time = time.time()
+    M = np.diag(np.diag(A)) # include time to form preconditioner
+    un_solver = optimize.AltPreCGSolver(A=A, b=b, M=M, full_output=1)
+    xopt, n_iter, u_resids, u_x_difs = un_solver.solve(x_true=x_true)
+    un_time = time.time() - st_time
+    print('UNTR final resid err: %f (%d iter)' % (norm_dif(xopt, A, b), n_iter))
+    print('UNTR time: %f\n' % un_time)
+
+    plt.figure(0)
+    plt.plot([t for (n,t) in u_resids], [n for (n,t) in u_resids], marker='o')
+    plt.figure(1)
+    plt.plot([t for (n,t) in u_resids], u_x_difs, marker='o')
+
+    # ===============================================
+    plt.figure(0)
+    plt.title('Residuals')
+    plt.legend(['Reg', 'Untrans'])
+    plt.yscale('log')
+    plt.xlabel('Time')
+    plt.ylabel('Residual norm')
+
+    plt.figure(1)
+    plt.title('Errors')
+    plt.legend(['Reg', 'Untrans'])
+    plt.yscale('log')
+    plt.xlabel('Time')
+    plt.ylabel('Error')
+
+
+    plt.show()
