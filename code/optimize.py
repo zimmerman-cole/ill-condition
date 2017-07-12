@@ -690,6 +690,8 @@ class TransPreCGSolver(Solver):
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         """
         TODO: Maybe not store full transformed matrix in memory
+
+        TODO: make this work
         """
         if 'recalc' not in kwargs:
             recalc = 20
@@ -698,6 +700,7 @@ class TransPreCGSolver(Solver):
 
         start_time = time.time()
         E = la.cholesky(self.M)
+
         Einv = la.inv(E)
         tr_A = np.dot(Einv, np.dot(self.A, Einv.T)) # (E^-1) (A) (E^-1).T
         tr_b = np.dot(Einv, self.b)               # transformed A(^), b
@@ -734,6 +737,8 @@ class TransPreCGSolver(Solver):
             r_norm = la.norm(new_r)
             residuals.append((r_norm, time.time() - start_time))
 
+            # ====================================
+
             if r_norm <= tol:
                 break
 
@@ -743,8 +748,10 @@ class TransPreCGSolver(Solver):
             B = new_rTr / rTr
 
             d = new_r + B * d
-
             r, rTr = new_r, new_rTr
+
+            a = rTr / np.dot(d.T, np.dot(tr_A, d))
+            x += a * d
 
         # We now have x_hat = E.T x; so return dot(Einv.T, x_hat) for x
         x = np.dot(Einv.T, x)
@@ -754,9 +761,91 @@ class TransPreCGSolver(Solver):
         else:
             return x, i, residuals, x_difs
 
+class AltPreCGSolver(Solver):
+    """
+    Untransformed Preconditioned Conjugate Gradient Method,
+        from painless-conjugate-gradient (pg 40).
 
+    TODO:
+        -Make process of applying preconditioner more efficient
+            (i.e. for diagonals, don't call la.inv, just 1/diag)
+    """
 
+    def __init__(self, A, b, M, full_output=False):
+        self.A, self.b = A, b
+        self.full_output = full_output
+        self.M = M
+        self.Minv = la.inv(self.M)
 
+    def _Minv(self, x):
+        """
+        FOR DIAGONAL PRECONDITIONERS M (i.e. Jacobi)
+        """
+        pass
+
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
+        if 'recalc' not in kwargs:
+            recalc = 20
+        else:
+            recalc = int(kwargs['recalc'])
+
+        start_time = time.time()
+
+        if x_true is not None:
+            x_difs = [la.norm(x - x_true)]
+
+        r = self.b - np.dot(self.A, x)
+        r_norm = la.norm(r)
+        residuals = [(r_norm, time.time() - start_time)]
+
+        if r_norm <= tol:
+            if x_true is None:
+                return x, 0, residuals
+            else:
+                return x, 0, residuals, x_difs
+
+        i = 1
+        d = np.dot(self.Minv, r)
+
+        rTMr = np.dot(r.T, np.dot(self.Minv, r))
+        Ad = np.dot(self.A, d)
+
+        a = rTMr / np.dot(d.T, Ad)
+
+        x += a * d
+
+        while i < max_iter:
+            if x_true is not None:
+                x_difs.append(la.norm(x - x_true))
+
+            if (i % recalc) == 0:
+                new_r = self.b - np.dot(self.A, x)
+            else:
+                new_r = r - a * Ad
+
+            r_norm = la.norm(new_r)
+            residuals.append((r_norm, time.time() - start_time))
+
+            if r_norm <= tol:
+                break
+
+            i += 1
+
+            new_rTMr = np.dot(new_r.T, np.dot(self.Minv, new_r))
+            B = new_rTMr / rTMr
+
+            d = np.dot(self.Minv, new_r) + B * d
+
+            r, rTMr = new_r, new_rTMr
+            Ad = np.dot(self.A, d)
+
+            a = rTMr / np.dot(d.T, Ad)
+            x += a * d
+
+        if x_true is None:
+            return x, i, residuals
+        else:
+            return x, i, residuals, x_difs
 
 
 
@@ -1020,6 +1109,10 @@ class IterativeRefinementGeneralSolver(Solver):
             path.append(x)
 
         return x
+
+
+
+
 
 
 # TODO: BiCGStab
