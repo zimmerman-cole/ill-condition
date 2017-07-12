@@ -1,5 +1,8 @@
 import numpy as np
 import numpy.linalg as la
+import scipy.linalg as sla
+import scipy.sparse as sp
+import scipy.sparse.linalg as sparsela
 import traceback, sys, scipy, time, sklearn
 from scipy import optimize as scopt
 from collections import OrderedDict
@@ -175,6 +178,129 @@ class DirectInverseSolver(Solver):
     def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
         path = [x]
         x = np.dot(self.A_inv, self.b)
+        path.append(x)
+        return path
+
+class DecompositionSolver(Solver):
+
+    def __init__(self, A, b, d_type=None, full_output=False):
+        self.A = A
+        self.b = b
+        self.d_type = d_type
+        ## L: Lower or Orthogonal, R: Upper
+        if self.d_type == 'qr':
+            self.L, self.R = la.qr(A)
+            self.R = sp.csr_matrix(self.R)
+        if self.d_type == 'lu':
+            P, self.L, self.R = sla.lu(A)
+            self.L = np.dot(P, self.L)
+            self.L = sp.csr_matrix(self.L)
+            self.R = sp.csr_matrix(self.R)
+        if self.d_type == 'cholesky':
+            self.L = la.cholesky(A)
+            self.R = self.L.T
+            self.L = sp.csr_matrix(self.L)
+            self.R = sp.csr_matrix(self.R)
+        self.full_output = full_output
+
+    def _check_ready(self):
+        """
+        TODO:
+        """
+        pass
+
+    def __str__(self):
+        l1 = 'Decomposition Solver\n'
+        if self.A is None:
+            l2 = 'A: None; '
+        else:
+            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+        if self.b is None:
+            l2 += 'b: None\n'
+        else:
+            l2 += 'b: %d x %d\n' % (len(self.b), len(self.b.T))
+        if self.d_type:
+            l3 = 'd_type: %s' % self.d_type
+        if self.d_type:
+            l4 = 'd_type: None\n'
+        else:
+            l4 = 'full_output: False'
+        return l1+l2+l3+l4
+
+    def __repr__(self):
+        return self.__str__()
+
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
+        ## TODO: TEST
+        ## initialize
+        i = 0
+        start_time = time.time()
+        residuals = []
+        if x_true is not None:
+            x_difs = [la.norm(x - x_true)]
+
+        ## residuals (0)
+        r = self.b - np.dot(self.A, x)
+        r_norm = la.norm(r)
+        residuals.append((r_norm, time.time() - start_time))
+
+        ## solve
+        if self.d_type == 'qr':
+            y = np.dot(self.L.T,self.b)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        elif self.d_type == 'lu':
+            y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        elif self.d_type == 'cholesky':
+            y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        else:
+            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            sys.exit()
+
+        ## residuals (1)
+        r = self.b - np.dot(self.A, x)
+        r_norm = la.norm(r)
+        residuals.append((r_norm, time.time() - start_time))
+
+        if x_true is not None:
+            x_difs.append(la.norm(x - x_true))
+
+        if x_true is None:
+            return x, i, residuals
+        else:
+            return x, i, residuals, x_difs
+
+    def _bare(self, tol, x, max_iter, **kwargs):
+        if self.d_type == 'qr':
+            y = np.dot(self.L.T,self.b)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        elif self.d_type == 'lu':
+            y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        elif self.d_type == 'cholesky':
+            y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        else:
+            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            sys.exit()
+        return x
+
+    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+        ## TODO: TEST
+        path = [x]
+        if self.d_type == 'qr':
+            y = np.dot(self.L.T,self.b)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        elif self.d_type == 'lu':
+            y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        elif self.d_type == 'cholesky':
+            y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
+            x = sparsela.spsolve_triangular(self.R, y, lower=False)
+        else:
+            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            sys.exit()
         path.append(x)
         return path
 
