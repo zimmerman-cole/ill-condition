@@ -5,3 +5,6 @@
 	
 - notes
 	- algorithm notes and background - https://www.overleaf.com/10005709nctqbxjszjpc
+
+- problem
+	- problem notes and writeup - https://www.overleaf.com/10315281fcttmvzpfpgj
