@@ -186,21 +186,6 @@ class DecompositionSolver(Solver):
     def __init__(self, A, b, d_type=None, full_output=False):
         self.A = A
         self.b = b
-        self.d_type = d_type
-        ## L: Lower or Orthogonal, R: Upper
-        if self.d_type == 'qr':
-            self.L, self.R = la.qr(A)
-            self.R = sp.csr_matrix(self.R)
-        if self.d_type == 'lu':
-            P, self.L, self.R = sla.lu(A)
-            self.L = np.dot(P, self.L)
-            self.L = sp.csr_matrix(self.L)
-            self.R = sp.csr_matrix(self.R)
-        if self.d_type == 'cholesky':
-            self.L = la.cholesky(A)
-            self.R = self.L.T
-            self.L = sp.csr_matrix(self.L)
-            self.R = sp.csr_matrix(self.R)
         self.full_output = full_output
 
     def _check_ready(self):
@@ -232,7 +217,25 @@ class DecompositionSolver(Solver):
 
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         ## TODO: TEST
+
         ## initialize
+        self.d_type = kwargs["d_type"]
+        ## L: Lower or Orthogonal, R: Upper
+        if self.d_type == 'qr':
+            self.L, self.R = la.qr(self.A)
+            self.R = sp.csr_matrix(self.R)
+        if self.d_type == 'lu':
+            P, self.L, self.R = sla.lu(self.A)
+            self.L = np.dot(P, self.L)
+            self.L = sp.csr_matrix(self.L)
+            self.R = sp.csr_matrix(self.R)
+        if self.d_type == 'cholesky':
+            self.L = la.cholesky(self.A)
+            self.R = self.L.T
+            self.L = sp.csr_matrix(self.L)
+            self.R = sp.csr_matrix(self.R)
+
+
         i = 0
         start_time = time.time()
         residuals = []
@@ -272,6 +275,23 @@ class DecompositionSolver(Solver):
             return x, i, residuals, x_difs
 
     def _bare(self, tol, x, max_iter, **kwargs):
+        ## initialize
+        self.d_type = kwargs["d_type"]
+        ## L: Lower or Orthogonal, R: Upper
+        if self.d_type == 'qr':
+            self.L, self.R = la.qr(self.A)
+            self.R = sp.csr_matrix(self.R)
+        if self.d_type == 'lu':
+            P, self.L, self.R = sla.lu(self.A)
+            self.L = np.dot(P, self.L)
+            self.L = sp.csr_matrix(self.L)
+            self.R = sp.csr_matrix(self.R)
+        if self.d_type == 'cholesky':
+            self.L = la.cholesky(self.A)
+            self.R = self.L.T
+            self.L = sp.csr_matrix(self.L)
+            self.R = sp.csr_matrix(self.R)
+
         if self.d_type == 'qr':
             y = np.dot(self.L.T,self.b)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
@@ -288,6 +308,23 @@ class DecompositionSolver(Solver):
 
     def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
         ## TODO: TEST
+        ## initialize
+        self.d_type = kwargs["d_type"]
+        ## L: Lower or Orthogonal, R: Upper
+        if self.d_type == 'qr':
+            self.L, self.R = la.qr(self.A)
+            self.R = sp.csr_matrix(self.R)
+        if self.d_type == 'lu':
+            P, self.L, self.R = sla.lu(self.A)
+            self.L = np.dot(P, self.L)
+            self.L = sp.csr_matrix(self.L)
+            self.R = sp.csr_matrix(self.R)
+        if self.d_type == 'cholesky':
+            self.L = la.cholesky(self.A)
+            self.R = self.L.T
+            self.L = sp.csr_matrix(self.L)
+            self.R = sp.csr_matrix(self.R)
+
         path = [x]
         if self.d_type == 'qr':
             y = np.dot(self.L.T,self.b)
@@ -1162,7 +1199,7 @@ class IterativeRefinementGeneralSolver(Solver):
             decay_rate = 0.5
         else:
             decay_rate = float(kwargs['decay_rate'])
-
+        self.d_type = kwargs["d_type"]
 
         start_time = time.time()
         residuals = []
@@ -1188,7 +1225,8 @@ class IterativeRefinementGeneralSolver(Solver):
 
             ## call intermediate solver method
             solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
-            d_i, i_i, r_i, x_d_i = solver_object.solve(tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20, x_true=x_true)
+            d_i, i_i, r_i, x_d_i = solver_object.solve( tol=10**-5, x_0=r, max_iter=self.intermediate_iter, \
+                                                         recalc=20, x_true=x_true, d_type=self.d_type )
             # residuals.append((la.norm(r_i),time.time() - start_time))
             # x_difs.append(la.norm(x_d_i))
 
