@@ -132,7 +132,7 @@ class Ray:
         if self.type == 'H':
             raise Exception('horizontal what')
 
-        return ddy / (1.0 / np.tan(self.angle))
+        return ddy / np.tan(self.angle)
 
 class Pixel:
 
@@ -291,15 +291,23 @@ for r in rays:
         print('angle: %f' % r.angle)
 
         # for each row of pixels:
+        row_num = 0
         for p_row in px:
             ddy = p_row[0].dy   # y-coord of this row's top side (w/ respect to CC)
+
 
 
             x_intersec = r._intersects_y(ddy)  # first, find x-value where this ray
                                                 # intersects this row's top side
 
-            vis(px, (Const.cx, Const.cy), Const.rad, rays=[r], pts=[(Const.cx+x_intersec, Const.cy+ddy)])
-            sys.exit(0)
+            # check if it actually intersects any pixel in this row
+            if 0 <= x_intersec <= _max_:
+                print('row of intersection: %d' % row_num)
+                vis(px, (Const.cx, Const.cy), Const.rad, rays=[r], pts=[(Const.cx+x_intersec, Const.cy+ddy)])
+                #sys.exit(0)
+
+
+            row_num += 1
 
 
     ray_num += 1
