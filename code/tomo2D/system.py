@@ -3,6 +3,8 @@ import numpy.linalg as la
 import matplotlib.pyplot as plt
 import sys
 
+# TODO: Fix the HACK when processing vertical rays
+
 """ NOTE:
 
 In this file, there are two "coordinate systems" used. Both use (x,y), but
@@ -33,27 +35,33 @@ def vis(px, c_center, c_rad, rays=[], \
     """
     fig, ax = plt.subplots()
 
-    # x- and y-coords of top-left corners of each pixel
-    px_flat = np.array(px).flatten()
-    xs = [p.x for p in px_flat]
-    ys = [p.y for p in px_flat]
+    xs = np.array([ [p.x for p in row]+[row[-1].x+Const.ps] for row in px ]).flatten()
+
+    ys = np.array([ [p.y for p in row]+[row[-1].y]          for row in px ]).flatten()
+
+    # px_flat = np.array(px).flatten()
+    # xs = [p.x for p in px_flat]
+    # ys = [p.y for p in px_flat]
 
     ax.plot(xs, ys, marker='o')
 
     circle = plt.Circle(c_center, c_rad, color='r')
 
     ax.add_artist(circle)
+    ax.plot([c_center[0]], [c_center[1]], marker='o', color='y', markersize=15)
     ax.axis([c_center[0] - 1.25*c_rad, c_center[0] + 1.25 * c_rad,
                 c_center[1] - 1.25*c_rad, c_center[1] + 1.25 * c_rad])
 
-    ar_size = 10.0   # arrow size ~~ (1 / ar_size)
+    ar_size = 0.5   # arrow size ~~ (1 / ar_size)
     for r in rays:
+        ax.plot([r.ox], [r.oy], marker='o', color='g')
         ax.arrow(x=r.ox, y=r.oy, dx=-r.dx/ar_size, dy=-r.dy/ar_size)
-        #ax.plot(r.ox, r.oy, marker='x')
+        #ax.plot(r.ox, r.oy, marker='x', markersize=10, color='black')
 
     if (rays != []) and (pts is not None):
         ax.plot([x for x, y in pts], [y for x, y in pts], marker='o')
 
+    plt.title('NOTE: Bottom-most blue line is missing')
     plt.show()
 
 class Const:
@@ -87,7 +95,7 @@ class Ray:
 
         self.angle = angle
 
-        print('ang: %f' % self.angle)
+        #print('ang: %f' % self.angle)
 
         # Check if this ray shoots vertically, horizontally, or at an angle.
         if abs(angle) < 0.00001 or abs(angle - np.pi) < 0.00001:
@@ -100,8 +108,8 @@ class Ray:
             # at an angle
             self.type = 'A'
 
-        print('type: ' + self.type)
-        raw_input()
+        # print('type: ' + self.type)
+        # raw_input()
 
     def _intersects_x(self, ddx):
         """
@@ -109,9 +117,9 @@ class Ray:
             (cx: x-coordinate of CC)
         """
 
-        # if this ray is VERTICAL
+        # if this ray is VERTICAL and this was called, something went wrong
         if self.type == 'V':
-            return 'V'
+            raise Exception('vertical what')
 
         return float(ddx) * np.tan(self.angle)
 
@@ -120,9 +128,9 @@ class Ray:
         Calculate ray's x-value at given y=cy+ddy.
             (cy: y-coordinate of CC)
         """
-        # if this ray is HORIZONTAL
+        # if this ray is HORIZONTAL and this was called, something went wrong
         if self.type == 'H':
-            return 'H'
+            raise Exception('horizontal what')
 
         return ddy / (1.0 / np.tan(self.angle))
 
@@ -192,9 +200,9 @@ coords = [ [(i, j) for i in range(0, int(_max_), int(Const.ps))] for j in range(
 # ^ coords of top-left corner of each pixel
 # =======================================================
 
-print('\nTOP-LEFT COORDS OF BOTTOM-LEFT-MOST 5x5:')
-for row in coords[-5:]:
-    print(row[:5])
+# print('\nTOP-LEFT COORDS OF BOTTOM-LEFT-MOST 5x5:')
+# for row in coords[-5:]:
+#     print(row[:5])
 
 # create 2D array of PIXEL objects (class defined above)
 px = []
@@ -206,15 +214,18 @@ for i in range(len(coords)):
         j += 1
 
 rays = []
-n_rays = 18
+n_rays = 8
 arc_range = 1.0 * np.pi
 
+print
 ray_st_s = arc_range / float(n_rays) # ray "step size"
-for ang in [ray_st_s*j for j in range(n_rays)]:
-    # print('ang: %f' % ang)
+angs = [ray_st_s * j for j in range(n_rays)]
+
+for ang in angs:
     rays.append(Ray(ang))
 
-    # raw_input()
+#vis(px, (Const.cx, Const.cy), Const.rad, rays=rays)
+
 
 # print('\nRay origins:')
 # for r in rays:
@@ -223,6 +234,8 @@ for ang in [ray_st_s*j for j in range(n_rays)]:
 # intersections for each ray
 ray_Xs = []
 ray_num = 0
+
+vis(px, (Const.cx, Const.cy), Const.rad, rays=rays)
 
 # for each ray:
 for r in rays:
@@ -237,6 +250,10 @@ for r in rays:
         #   intersection is equal to the length of the pixel. For all other
         #   pixels, the length of intersection is 0.
 
+        # print('ray_num: %d  ang: %f ' % (ray_num, r.angle  ))
+        # print('type: ' + r.type)
+
+
         for row_num in range(len(px)):    # locate the row of pixels
             if (px[row_num][0].dy - 100) <= r.dy < px[row_num][0].dy:
 
@@ -244,37 +261,49 @@ for r in rays:
                 for i in range(len(px[row_num])):
                     ray_Xs[ray_num][row_num][i] = Const.ps
 
-
+        # print(ray_Xs[ray_num])
+        # vis(px, (Const.cx, Const.cy), Const.rad, rays=[r])
 
     elif r.type == 'V':
         # same idea for VERTICAL rays
+
+        # print('ray_num: %d  ang: %f ' % (ray_num, r.angle  ))
+        # print('type: ' + r.type)
+
+
         for col_num in range(len(px)):    # locate the row of pixels
             if (px[0][col_num].dx - 100) <= r.dx < px[0][col_num].dx:
+                print('cnum: %d' % col_num)
+                print('r.dx: %f' % r.dx)
+                print(px[0][col_num].dx)
+
                 # mark down the row's intersection lengths
                 for i in range(len(px[col_num])):
-                    ray_Xs[ray_num][i][col_num] = Const.ps
+                    # HACK: col_num - 1
+                    ray_Xs[ray_num][i][col_num-1] = Const.ps
+
+        # print(ray_Xs[ray_num])
+        # vis(px, (Const.cx, Const.cy), Const.rad, rays=[r])
+
     else:
         # for NON-HORIZONTAL and NON-VERTICAL rays
+        print('ray num: %d' % ray_num)
+        print('angle: %f' % r.angle)
 
         # for each row of pixels:
-        # for p_row in px:
-        #     ddy = p_row[0].dy   # y-coord of this row's top side (w/ respect to CC)
-        #
-        #
-        #     x_intersec = r._intersects_y(ddy)  # first, find x-value where this ray
-        #                                         # intersects this row's top side
-        #
-        #     vis(px, (Const.cx, Const.cy), Const.rad, rays=[rays[0]], pts=[(Const.cx+x_intersec, Const.cy+ddy)])
-        #     sys.exit(0)
-        pass
+        for p_row in px:
+            ddy = p_row[0].dy   # y-coord of this row's top side (w/ respect to CC)
+
+
+            x_intersec = r._intersects_y(ddy)  # first, find x-value where this ray
+                                                # intersects this row's top side
+
+            vis(px, (Const.cx, Const.cy), Const.rad, rays=[r], pts=[(Const.cx+x_intersec, Const.cy+ddy)])
+            sys.exit(0)
+
 
     ray_num += 1
 
-for ray_num in range(len(ray_Xs)):
-    print('ray_num: %d  ang: %f ' % (ray_num, rays[ray_num].angle  ))
-    print('type: ' + rays[ray_num].type)
-    print(ray_Xs[ray_num])
-    raw_input()
 
 
 # for ray_n in range(len(ray_Xs)):
