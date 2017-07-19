@@ -233,11 +233,23 @@ def gen_eep(x_grid, y_grid, thetas):
     return points
 
 def gen_X(n_1=None, n_2=None, m=None, sp_rep=False, debug=False):
+    """
+    Args:
+        (int)          n_1: number of rows in image.
+        (int)          n_2: number of columns in image.
+        (int)            m: number of rays to fire.
+        (boolean)   sp_rep: whether to return X as a CSR matrix.
+        (boolean)    debug: debugging tool.
+
+    Returns:
+        (numpy.ndarray OR scipy.sparse.csr_matrix)  X:
+            the system matrix/forward projector with dimensions m x (n_1*n_2).
+    """
     ## handle args
-    if n_1 % 2 == 1:
-        n_1 += 1
-    if n_2 % 2 == 1:
-        n_2 += 1
+    if (n_1 % 2) == 1 or (n_2 % 2) == 1:
+        # TODO: handle odds?s
+        raise ValueError('Dimensions of image must be even.')
+
     n_1 = int(n_1)
     n_2 = int(n_2)
     m = int(m)
@@ -261,5 +273,6 @@ def gen_X(n_1=None, n_2=None, m=None, sp_rep=False, debug=False):
     else:
         return(X)
 
-X = gen_X(n_1=8, n_2=4, m=3, sp_rep=False, debug=False)
-print(X)
+if __name__ == "__main__":
+    X = gen_X(n_1=8, n_2=4, m=3, sp_rep=False, debug=False)
+    print(X)
