@@ -302,3 +302,61 @@ def preconditioned_cg():
 
 
     plt.show()
+
+#http://utminers.utep.edu/xzeng/2017spring_math5330/MATH_5330_Computational_Methods_of_Linear_Algebra_files/ln07.pdf
+def cgs(n=500, max_iter=500, tol=0.1, cond_num=100):
+
+    A = util.mat_from_cond(cond_num=cond_num, m=n, n=n)
+    x_true = 4 * np.random.randn(n)
+    b = np.dot(A, x_true)
+
+    init_err = norm_dif(np.zeros(n), A, b)
+
+    #print('Initial resid err: %f' % init_err)
+
+
+    # START CG SQUARED ============================
+    st_time = time.time()
+    # Alg 2.2 from above:
+    x = np.zeros(n)
+
+    r = b - np.dot(A, x)            # r0 (normal residual)
+    cgs_resids = [(la.norm(r), time.time() - st_time)]
+    rh = np.copy(r)
+    assert np.inner(r, rh) >= 0.0001 # choose rh such that dot(r,rh) != 0
+    p, u = np.copy(r), np.copy(r)    # p0, u0
+
+    i = 0
+    while i < max_iter:
+        i += 1
+        a = np.inner(r, rh) / (np.dot(np.dot(A, p), rh)) # Line 4
+
+        q = u - a * np.dot(A, p)            # 5
+
+        x += a * (u + q)                    # 6
+
+        new_r = r - a * np.dot(A, u + q)       # 7
+        cgs_resids.append((la.norm(new_r), time.time() - st_time))
+
+        if la.norm(new_r) < tol: break      # 8, 9
+
+        B = np.inner(new_r, rh) / np.inner(r, rh)   # 11
+
+        u = new_r + B * q           # 12
+
+        p = u + B*(q + B*p)
+
+        r = new_r
+
+    cgs_time = time.time() - st_time
+    final_err = norm_dif(x, A, b)
+
+    #print('CGS final resid err: %f' % final_err)
+    #print('%d iter' % i)
+    #print('Took %f sec' % cgs_time)
+
+    # plt.plot([t for (n,t) in cgs_resids], [n for (n,t) in cgs_resids], marker='o')
+    # plt.yscale('log')
+    # plt.show()
+
+    return final_err < init_err
