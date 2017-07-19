@@ -255,7 +255,7 @@ def gen_eep(x_grid, y_grid, thetas, debug=False):
         print("")
     return points
 
-def gen_X(n_1=None, n_2=None, m=None, sp_rep=False, debug=False):
+def gen_X(n_1, n_2, m, sp_rep=False, debug=False):
     """
     Args:
         (int)          n_1: number of rows in image.

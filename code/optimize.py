@@ -8,6 +8,9 @@ from scipy import optimize as scopt
 from collections import OrderedDict
 from sklearn.linear_model import SGDClassifier
 
+# TODO: make these methods compatible with scipy sparse matrices
+#       i.e.    -remove all len(A) where A is sparse
+#               -replace all np.dot(A, _) w/ A.dot(_)
 
 class Solver:
     """
@@ -36,7 +39,8 @@ class Solver:
         """
         if self.A is None or self.b is None:
             raise AttributeError('A and/or b haven\'t been set yet.')
-        if len(self.A) != len(self.b):
+
+        if self.A.shape[0] != len(self.b):
             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
 
 
@@ -72,7 +76,7 @@ class Solver:
         """
         self._check_ready()
         if x_0 is None:
-            x = np.zeros(len(self.A.T))
+            x = np.zeros(self.A.shape[1])
         else:
             x = np.copy(x_0)
 
@@ -98,7 +102,7 @@ class Solver:
         """
         Make sure _full, _bare and path give roughly the same x.
         """
-        x_0 = np.random.randn(len(self.A))
+        x_0 = np.random.randn(self.A.shape[0])
         x_full = self._full(tol=10**-5, x=np.copy(x_0),   max_iter=500, recalc=20, x_true=None)[0]
         x_bare = self._bare(tol=10**-5, x=np.copy(x_0),   max_iter=500, recalc=20)
         x_path = self.path(tol=10**-5,  x_0=np.copy(x_0), max_iter=500, recalc=20)[-1]
@@ -541,7 +545,7 @@ class ConjugateGradientsSolver(Solver):
         if self.A is None:
             l2 = 'A: None; '
         else:
-            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+            l2 = 'A: %d x %d; ' % (self.A.shape[0], self.A.shape[1])
         if self.b is None:
             l2 += 'b: None\n'
         else:
@@ -577,7 +581,7 @@ class ConjugateGradientsSolver(Solver):
             x_difs = [la.norm(x - x_true)]
 
         # First descent step (gradient descent step) ===========================
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         r_norm = la.norm(r)
         residuals = [(r_norm, time.time() - start_time)]
 
@@ -595,7 +599,7 @@ class ConjugateGradientsSolver(Solver):
 
         #ds, rs = [d], [r]   # DEBUG
 
-        Ad = np.dot(self.A, d)
+        Ad = self.A.dot(d)
         a = rTr / np.dot(d.T, Ad)
         x += a * d
 
@@ -605,7 +609,7 @@ class ConjugateGradientsSolver(Solver):
             if x_true is not None:
                 x_difs.append(la.norm(x - x_true))
             if (i % recalc) == 0:
-                new_r = self.b - np.dot(self.A, x)
+                new_r = self.b - self.A.dot(x)
             else:
                 new_r = r - (a * Ad)
 
@@ -637,7 +641,7 @@ class ConjugateGradientsSolver(Solver):
             #rs.append(new_r)
 
             r, rTr = new_r, new_rTr
-            Ad = np.dot(self.A, d)
+            Ad = self.A.dot(d)
 
             a = rTr / np.dot(d.T, Ad)
 
@@ -656,7 +660,7 @@ class ConjugateGradientsSolver(Solver):
             recalc = int(kwargs['recalc'])
 
         # First descent step (GD) ==============================================
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         # Check if close enough already
         if la.norm(r) <= tol:
             return x
@@ -664,13 +668,13 @@ class ConjugateGradientsSolver(Solver):
         # If not, take a step
         rTr = np.dot(r.T, r)
         d = np.copy(r)
-        Ad = np.dot(self.A, d)
+        Ad = self.A.dot(d)
         a = rTr / np.dot(d.T, Ad)
         x += a * d
 
         for i in range(1, max_iter):
             if (i % recalc) == 0:
-                new_r = self.b - np.dot(self.A, x)
+                new_r = self.b - self.A.dot(x)
             else:
                 new_r = r - (a * Ad)
 
@@ -682,7 +686,7 @@ class ConjugateGradientsSolver(Solver):
 
             d = new_r + beta * d
             r, rTr = new_r, new_rTr
-            Ad = np.dot(self.A, d)
+            Ad = self.A.dot(d)
 
             a = rTr / np.dot(d.T, Ad)
 
@@ -698,14 +702,14 @@ class ConjugateGradientsSolver(Solver):
 
         self._check_ready()
         if x_0 is None:
-            x = np.zeros(len(self.A))
+            x = np.zeros(self.A.shape[0])
         else:
             x = np.copy(x_0)
         # ======================================================================
         path = [np.copy(x)]
 
         # First descent step (GD) ==============================================
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         # Check if close enough already
         if la.norm(r) <= tol:
             return path
@@ -713,14 +717,14 @@ class ConjugateGradientsSolver(Solver):
         # If not, take a step
         rTr = np.dot(r.T, r)
         d = np.copy(r)
-        Ad = np.dot(self.A, d)
+        Ad = self.A.dot(d)
         a = rTr / np.dot(d.T, Ad)
         x += a * d
         path.append(np.copy(x))
 
         for i in range(1, max_iter):
             if (i % recalc) == 0:
-                new_r = self.b - np.dot(self.A, x)
+                new_r = self.b - self.A.dot(x)
             else:
                 new_r = r - (a * Ad)
 
@@ -732,7 +736,7 @@ class ConjugateGradientsSolver(Solver):
 
             d = new_r + beta * d
             r, rTr = new_r, new_rTr
-            Ad = np.dot(self.A, d)
+            Ad = self.A.dot(d)
 
             a = rTr / np.dot(d.T, Ad)
 
@@ -762,11 +766,11 @@ class PreconditionedCGSolver(Solver):
         self.intermediate_tol = float(intermediate_tol)
 
     def _check_ready(self):
-        if len(self.A) != len(self.b):
+        if self.A.shape[0] != len(self.b):
             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
 
-        assert isinstance(self.M, np.ndarray)
-        assert len(self.A) == len(self.A.T)
+        assert isinstance(self.M, np.ndarray) or isinstance(self.M, sp.spmatrix)
+        assert self.A.shape[0] == self.A.shape[1]
         assert self.M.shape == self.A.shape
 
 
@@ -786,7 +790,7 @@ class PreconditionedCGSolver(Solver):
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
 
-        r = np.dot(self.A, x) - self.b
+        r = self.A.dot(x) - self.b
         r_norm = la.norm(r)
         residuals = [(r_norm, time.time() - start_time)]
 
@@ -806,7 +810,7 @@ class PreconditionedCGSolver(Solver):
                                 max_iter=self.intermediate_iter)
         p = -np.copy(y)
 
-        Ap = np.dot(self.A, p)
+        Ap = self.A.dot(p)
         rTy = np.dot(r.T, y)
 
         a = rTy / float(np.dot(p.T, Ap))        # (5.39a)
@@ -819,7 +823,7 @@ class PreconditionedCGSolver(Solver):
                 x_difs.append(la.norm(x - x_true))
 
             if (i % recalc) == 0:
-                new_r = np.dot(self.A, x) - self.b
+                new_r = self.A.dot(x) - self.b
             else:
                 new_r = r + (a * Ap)                        # (5.39c)
 
@@ -845,7 +849,7 @@ class PreconditionedCGSolver(Solver):
             p = -new_y + beta * p                   # (5.39f)
 
             r, rTy, y = new_r, new_rTy, new_y
-            Ap = Ap = np.dot(self.A, p)
+            Ap = Ap = self.A.dot(p)
 
             a = rTy / np.dot(p.T, Ap)               # (5.39a)
             x += a * p                              # (5.39b)
@@ -857,6 +861,7 @@ class PreconditionedCGSolver(Solver):
             return x, i, residuals, x_difs
 
 # Use AltPreCGSolver instead
+# MAKE COMPATIBLE W/ SPARSE MATRICES
 class TransPreCGSolver(Solver):
     """
     Transformed Preconditioned Conjugate Gradient Method (from
@@ -991,7 +996,7 @@ class AltPreCGSolver(Solver):
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
 
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         r_norm = la.norm(r)
         residuals = [(r_norm, time.time() - start_time)]
 
@@ -1006,7 +1011,7 @@ class AltPreCGSolver(Solver):
 
         # rTMr = np.dot(r.T, self.mult(r))
         rTMr = np.dot(r.T, d)   # max ef
-        Ad = np.dot(self.A, d)
+        Ad = self.A.dot(d)
 
         a = rTMr / np.dot(d.T, Ad)
 
@@ -1017,7 +1022,7 @@ class AltPreCGSolver(Solver):
                 x_difs.append(la.norm(x - x_true))
 
             if (i % recalc) == 0:
-                new_r = self.b - np.dot(self.A, x)
+                new_r = self.b - self.A.dot(x)
             else:
                 new_r = r - a * Ad
 
@@ -1037,7 +1042,7 @@ class AltPreCGSolver(Solver):
             d = M_new_r + B * d
 
             r, rTMr = new_r, new_rTMr
-            Ad = np.dot(self.A, d)
+            Ad = self.A.dot(d)
 
             a = rTMr / np.dot(d.T, Ad)
             x += a * d
@@ -1219,6 +1224,8 @@ class IterativeRefinementGeneralSolver(Solver):
             decay_rate = 0.5
         else:
             decay_rate = float(kwargs['decay_rate'])
+            assert decay_rate < 1
+
         self.d_type = kwargs["d_type"]
 
         start_time = time.time()
