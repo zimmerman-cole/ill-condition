@@ -561,6 +561,17 @@ class ConjugateGradientsSolver(Solver):
         else:
             recalc = int(kwargs['recalc'])
 
+        if 'restart' not in kwargs:
+            restart = max_iter
+        else:
+            restart = int(kwargs['restart'])
+
+        if 'restart_mtd' not in kwargs:
+            restart_mtd = "gd"
+        else:
+            restart_mtd = int(kwargs['restart_mtd'])
+
+
         start_time = time.time()
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
@@ -610,8 +621,17 @@ class ConjugateGradientsSolver(Solver):
             # If not, take a step
             new_rTr = np.dot(new_r.T, new_r)
             beta = new_rTr / rTr
-
-            d = new_r + beta * d
+            if (i % restart) == 0:
+                if restart_mtd == "gd":
+                    d = new_r
+                elif restart_mtd == "beale":
+                    ## TODO: https://link-springer-com.proxy.uchicago.edu/content/pdf/10.1007%2FBF01593790.pdf
+                    d = new_r
+                else:
+                    print("must specify restart direction method")
+                    sys.exit()
+            else:
+                d = new_r + beta * d
 
             #ds.append(d)            # DEBUG
             #rs.append(new_r)

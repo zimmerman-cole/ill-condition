@@ -11,7 +11,7 @@ import os
 ## =============================================================================
 
 n = 500
-cond_num = 10**5 # 15 # 1000
+cond_num = 10**10 # 15 # 1000
 n_sims = 2
 eps = 10
 decay_rate = 0.5
@@ -19,8 +19,8 @@ main_iter = 1000
 int_iter = 1000
 
 t = "decay"
-# xax = "iteration"
-xax = "time"
+xax = "iteration"
+# xax = "time"
 
 ## setup plot
 fig, ax_cvg = plt.subplots()
@@ -36,7 +36,8 @@ def single_sim( A=None, b=None, x_0=None, x_true=None, cond_num=None, \
                 int_solver=None, int_iter=None, int_cont=None, \
                 d_type=None, \
                 eps=None, decay_rate=None, \
-                xax=None, ax_cvg=None, ax_bup=None, color=None ):
+                xax=None, ax_cvg=None, ax_bup=None, color=None, \
+                **kwargs ):
     ## instantiate
     solver_object = eval("optimize."+main_solver)
     if int_solver is not None:
@@ -50,7 +51,7 @@ def single_sim( A=None, b=None, x_0=None, x_true=None, cond_num=None, \
     ## solve
     x,i,resids,errs = solver_object.solve( x_0=x_0, x_true=x_true, max_iter=main_iter, \
                                            d_type=d_type, \
-                                           eps=eps, decay_rate=decay_rate )
+                                           eps=eps, decay_rate=decay_rate, **kwargs )
 
     ## plotting
     if int_solver is not None:
@@ -96,13 +97,22 @@ single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
             eps=eps, decay_rate=decay_rate, \
             xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='r' )
 
-## IR w/ fixed CG
+## Restarted CG
 single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
-            main_solver="IterativeRefinementGeneralSolver", main_iter=main_iter, \
-            int_solver="ConjugateGradientsSolver", int_iter=int_iter, int_cont=False, \
+            main_solver="ConjugateGradientsSolver", main_iter=main_iter, \
+            int_solver=None, int_iter=None, int_cont=None, \
             # d_type=None, \
             eps=eps, decay_rate=decay_rate, \
-            xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='b' )
+            xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='orange',
+            restart=500 )  ## restart=10,50,100,200,500
+
+# ## IR w/ fixed CG
+# single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
+#             main_solver="IterativeRefinementGeneralSolver", main_iter=main_iter, \
+#             int_solver="ConjugateGradientsSolver", int_iter=int_iter, int_cont=False, \
+#             # d_type=None, \
+#             eps=eps, decay_rate=decay_rate, \
+#             xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='b' )
 
 ## IR w/ cont CG
 single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
@@ -112,21 +122,21 @@ single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
             eps=eps, decay_rate=decay_rate, \
             xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='y' )
 
-## IR w/ fixed LU
-single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
-            main_solver="IterativeRefinementGeneralSolver", main_iter=main_iter, \
-            int_solver="DecompositionSolver", int_iter=int_iter, int_cont=False, \
-            d_type="lu", \
-            eps=eps, decay_rate=decay_rate, \
-            xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='g' )
+# ## IR w/ fixed LU
+# single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
+#             main_solver="IterativeRefinementGeneralSolver", main_iter=main_iter, \
+#             int_solver="DecompositionSolver", int_iter=int_iter, int_cont=False, \
+#             d_type="lu", \
+#             eps=eps, decay_rate=decay_rate, \
+#             xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='g' )
 
-## IR w/ cont LU
-single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
-            main_solver="IterativeRefinementGeneralSolver", main_iter=main_iter, \
-            int_solver="DecompositionSolver", int_iter=int_iter, int_cont=True, \
-            d_type="lu", \
-            eps=eps, decay_rate=decay_rate, \
-            xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='black' )
+# ## IR w/ cont LU
+# single_sim( A=A, b=b, x_0=x_0, x_true=x_true, cond_num=cond_num, \
+#             main_solver="IterativeRefinementGeneralSolver", main_iter=main_iter, \
+#             int_solver="DecompositionSolver", int_iter=int_iter, int_cont=True, \
+#             d_type="lu", \
+#             eps=eps, decay_rate=decay_rate, \
+#             xax=xax, ax_cvg=ax_cvg, ax_bup=ax_bup, color='black' )
 
 
 plt.yscale('log')
