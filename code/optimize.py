@@ -115,23 +115,19 @@ class DirectInverseSolver(Solver):
 
     def __init__(self, A, b, full_output=False):
         self.A = A
-        self.A_inv = la.inv(A)
+        if sp.issparse(A):
+            self.A_inv = sparsela.inv(A)
+        else:
+            self.A_inv = la.inv(A)
         self.b = b
         self.full_output = full_output
-
-
-    def _check_ready(self):
-        """
-        TODO:
-        """
-        pass
 
     def __str__(self):
         l1 = 'Direct Inverse Solver\n'
         if self.A is None:
             l2 = 'A: None; '
         else:
-            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+            l2 = 'A: %d x %d; ' % (self.A.shape[0], self.A.shape[1])
         if self.b is None:
             l2 += 'b: None\n'
         else:
@@ -155,15 +151,15 @@ class DirectInverseSolver(Solver):
             x_difs = [la.norm(x - x_true)]
 
         ## residuals (0)
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         r_norm = la.norm(r)
         residuals.append((r_norm, time.time() - start_time))
 
         ## solve
-        x = np.dot(self.A_inv, self.b)
+        x = self.A_inv.dot(self.b)
 
         ## residuals (1)
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         r_norm = la.norm(r)
         residuals.append((r_norm, time.time() - start_time))
 
@@ -176,12 +172,11 @@ class DirectInverseSolver(Solver):
             return x, i, residuals, x_difs
 
     def _bare(self, tol, x, max_iter, **kwargs):
-        #x = la.solve(self.A,self.b)
-        return np.dot(self.A_inv, self.b)
+        return self.A_inv.dot(self.b)
 
     def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
         path = [x]
-        x = np.dot(self.A_inv, self.b)
+        x = self.A_inv.dot(self.b)
         path.append(x)
         return path
 
@@ -189,21 +184,17 @@ class DecompositionSolver(Solver):
 
     def __init__(self, A, b, d_type=None, full_output=False):
         self.A = A
+        if sp.issparse(A):
+            raise NotImplementedError('Not implemented for sparse matrices.')
         self.b = b
         self.full_output = full_output
-
-    def _check_ready(self):
-        """
-        TODO:
-        """
-        pass
 
     def __str__(self):
         l1 = 'Decomposition Solver\n'
         if self.A is None:
             l2 = 'A: None; '
         else:
-            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+            l2 = 'A: %d x %d; ' % (self.A.shape[0], self.A.shape[1])
         if self.b is None:
             l2 += 'b: None\n'
         else:
@@ -247,7 +238,7 @@ class DecompositionSolver(Solver):
             x_difs = [la.norm(x - x_true)]
 
         ## residuals (0)
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         r_norm = la.norm(r)
         residuals.append((r_norm, time.time() - start_time))
 
@@ -266,7 +257,7 @@ class DecompositionSolver(Solver):
             sys.exit()
 
         ## residuals (1)
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         r_norm = la.norm(r)
         residuals.append((r_norm, time.time() - start_time))
 
@@ -311,6 +302,13 @@ class DecompositionSolver(Solver):
         return x
 
     def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+        self._check_ready()
+        if x_0 is None:
+            x = np.zeros(self.A.shape[1])
+        else:
+            x = np.copy(x_0)
+
+
         ## TODO: TEST
         ## initialize
         self.d_type = kwargs["d_type"]
@@ -367,7 +365,7 @@ class GradientDescentSolver(Solver):
         if self.A is None:
             l2 = 'A: None; '
         else:
-            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+            l2 = 'A: %d x %d; ' % (self.A.shape[0], self.A.shape[1])
         if self.b is None:
             l2 += 'b: None\n'
         else:
@@ -398,7 +396,7 @@ class GradientDescentSolver(Solver):
             x_difs = [la.norm(x - x_true)]
 
         # First descent step ======================================
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         r_norm = la.norm(r)
         residuals = [(r_norm, time.time() - start_time)]
 
@@ -411,7 +409,7 @@ class GradientDescentSolver(Solver):
 
         # If not, take a step
         i = 1
-        Ar = np.dot(self.A, r)
+        Ar = self.A.dot(r)
         a = np.inner(r.T, r) / np.dot(r.T, Ar)
         x += a * r
         # =========================================================
@@ -422,7 +420,7 @@ class GradientDescentSolver(Solver):
                 x_difs.append(la.norm(x - x_true))
             # Directly calculate residual every 'recalc' steps
             if (i % recalc) == 0:
-                r = self.b - np.dot(self.A, x)
+                r = self.b - self.A.dot(x)
             else:
                 # Else, update using one less matrix-vector product
                 r -= a * Ar
@@ -434,7 +432,7 @@ class GradientDescentSolver(Solver):
             i += 1
 
             # If not, take another step
-            Ar = np.dot(self.A, r)
+            Ar = self.A.dot(r)
             x += a * r
 
         if x_true is None:
@@ -452,13 +450,13 @@ class GradientDescentSolver(Solver):
             recalc = int(kwargs['recalc'])
 
         # First descent step ==========================================
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         # Check if close enough already
         if la.norm(r) <= tol:
             return x
 
         # If not, take a step
-        Ar = np.dot(self.A, r)
+        Ar = self.A.dot(r)
         a = np.inner(r.T, r) / np.dot(r.T, Ar)
         x += a * r
         # ==============================================================
@@ -466,7 +464,7 @@ class GradientDescentSolver(Solver):
         for i in range(1, max_iter):
             # Directly calculate residual every 'recalc' steps
             if (i % recalc) == 0:
-                r = self.b - np.dot(self.A, x)
+                r = self.b - self.A.dot(x)
             else:
                 # Else, update using one less matrix-vector product
                 r -= a * Ar
@@ -475,7 +473,7 @@ class GradientDescentSolver(Solver):
             if la.norm(r) <= tol: break
 
             # If not, take another step
-            Ar = np.dot(self.A, r)
+            Ar = self.A.dot(r)
             x += a * r
 
         return x
@@ -489,25 +487,23 @@ class GradientDescentSolver(Solver):
         else:
             recalc = int(kwargs['recalc'])
         # ======================================================================
-        if self.A is None or self.b is None:
-            raise AttributeError('A and/or b haven\'t been set yet.')
+        self._check_ready()
 
-        assert len(self.A) == len(self.A.T) == len(self.b)
         if x_0 is None:
-            x = np.zeros(len(self.A.T))
+            x = np.zeros(self.A.shape[1])
         else:
             x = np.copy(x_0)
         # ======================================================================
         path = [np.copy(x)]
 
         # First descent step ===================================================
-        r = self.b - np.dot(self.A, x)
+        r = self.b - self.A.dot(x)
         # Check if close enough already
         if la.norm(r) <= tol:
             return x
 
         # If not, take a step
-        Ar = np.dot(self.A, r)
+        Ar = self.A.dot(r)
         a = np.inner(r.T, r) / np.dot(r.T, Ar)
         x += a * r
         path.append(np.copy(x))
@@ -516,7 +512,7 @@ class GradientDescentSolver(Solver):
         for i in range(1, max_iter):
             # Directly calculate residual every 'recalc' steps
             if (i % recalc) == 0:
-                r = self.b - np.dot(self.A, x)
+                r = self.b - self.A.dot(x)
             else:
                 # Else, update using one less matrix-vector product
                 r -= a * Ar
@@ -525,7 +521,7 @@ class GradientDescentSolver(Solver):
             if la.norm(r) <= tol: break
 
             # If not, take another step
-            Ar = np.dot(self.A, r)
+            Ar = self.A.dot(r)
             x += a * r
             path.append(np.copy(x))
 
@@ -875,6 +871,9 @@ class TransPreCGSolver(Solver):
 
     def __init__(self, A, b, M, full_output=False):
         self.A, self.b = A, b
+        if sp.issparse(A):
+            raise NotImplementedError('Not implemented for sparse matrices.')
+
         self.full_output = full_output
         self.M = M
 
@@ -1065,7 +1064,7 @@ class IterativeRefinementSolver(Solver):
         if self.A is None:
             l2 = 'A: None; '
         else:
-            l2 = 'A: %d x %d; ' % (len(self.A), len(self.A.T))
+            l2 = 'A: %d x %d; ' % (self.A.shape[0], self.A.shape[1])
         if self.b is None:
             l2 += 'b: None\n'
         else:
@@ -1081,7 +1080,10 @@ class IterativeRefinementSolver(Solver):
 
     def _full(self, tol, x, max_iter, x_true, **kwargs):
         if 'eps' not in kwargs:
-            eps = 2 * la.norm(self.A)
+            if sp.issparse(self.A):
+                eps = 2 * sparsela.norm(self.A)
+            else:
+                eps = 2 * la.norm(self.A)
         else:
             eps = float(kwargs['eps'])
 
@@ -1095,7 +1097,7 @@ class IterativeRefinementSolver(Solver):
         while i < max_iter:
             if x_true is not None:
                 x_difs.append(la.norm(x - x_true))
-            r = self.b - np.dot(self.A, x)
+            r = self.b - self.A.dot(x)
             r_norm = la.norm(r)
             residuals.append((r_norm, time.time() - start_time))
 
@@ -1104,10 +1106,13 @@ class IterativeRefinementSolver(Solver):
             i += 1
 
             eps *= 0.5
-            A_e = self.A + eps * np.identity(len(self.A))
+            if sp.issparse(self.A):
+                A_e = self.A + eps * sp.eye(self.A.shape[0])
+                x += sparsela.inv(A_e).dot(r)
+            else:
+                A_e = self.A + eps * np.identity(self.A.shape[0])
+                x += la.inv(A_e).dot(r)
 
-
-            x += np.dot(la.inv(A_e), r)
 
 
 
@@ -1118,26 +1123,37 @@ class IterativeRefinementSolver(Solver):
 
     def _bare(self, tol, x, max_iter, **kwargs):
         if 'eps' not in kwargs:
-            eps = 2 * la.norm(self.A)
+            if sp.issparse(self.A):
+                eps = 2 * sparsela.norm(self.A)
+            else:
+                eps = 2 * la.norm(self.A)
         else:
             eps = float(kwargs['eps'])
 
         for i in range(max_iter):
-            r = self.b - np.dot(self.A, x)
+            r = self.b - self.A.dot(x)
 
             if la.norm(r) <= tol:
                 break
 
             eps *= 0.5
-            A_e = self.A + eps * np.identity(len(self.A))
 
-            x += np.dot(la.inv(A_e), r)
+
+            if sp.issparse(A_e):
+                A_e = self.A + eps * sp.eye(self.A.shape[0])
+                x += sparsela.inv(A_e).dot(r)
+            else:
+                A_e = self.A + eps * np.identity(self.A.shape[0])
+                x += la.inv(A_e).dot(r)
 
         return x
 
     def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
         if 'eps' not in kwargs:
-            eps = 2 * la.norm(self.A)
+            if sp.issparse(self.A):
+                eps = 2 * sparsela.norm(self.A)
+            else:
+                eps = 2 * la.norm(self.A)
         else:
             eps = float(kwargs['eps'])
 
@@ -1145,22 +1161,27 @@ class IterativeRefinementSolver(Solver):
 
         self._check_ready()
         if x_0 is None:
-            x = np.zeros(len(self.A))
+            x = np.zeros(self.A.shape[0])
         else:
             x = np.copy(x_0)
 
         path = [np.copy(x)]
 
         for i in range(max_iter):
-            r = self.b - np.dot(self.A, x)
+            r = self.b - self.A.dot(x)
 
             if la.norm(r) <= tol:
                 break
 
             eps *= 0.5
-            A_e = self.A + eps * np.identity(len(self.A))
 
-            x += np.dot(la.inv(A_e), r)
+            if sp.issparse(A_e):
+                A_e = self.A + eps * sp.eye(self.A.shape[0])
+                x += sparsela.inv(A_e).dot(r)
+            else:
+                A_e = self.A + eps * np.identity(self.A.shape[0])
+                x += la.inv(A_e).dot(r)
+
             path.append(np.copy(x))
 
 

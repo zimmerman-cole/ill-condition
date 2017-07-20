@@ -88,7 +88,6 @@ def compare_gd():
 def plot_iter_refine(cond_num=1000, m=100, n=100):
     """
     Plot residuals vs time for iterative refinement w/ decaying epsilon.
-        (Continuation)
     """
     A = util.mat_from_cond(cond_num=cond_num, m=m, n=n)
     true_x = 4 * np.random.randn(n)
