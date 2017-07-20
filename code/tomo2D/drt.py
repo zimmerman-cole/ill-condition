@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.linalg as la
 import scipy.sparse as sparse
 import pprint
 
@@ -43,6 +44,7 @@ def siddon_algorithm(x1, y1, x2, y2, x_grid, y_grid, debug=False):
     Nx = x_grid.size
     Ny = y_grid.size
     if debug:
+        print("=============== SIDDON ===============")
         print("Nx, Ny: %s, %s" % (Nx,Ny))
 
     # calculate the range of parametric values
@@ -161,22 +163,39 @@ def siddon_algorithm(x1, y1, x2, y2, x_grid, y_grid, debug=False):
     cells = (i, j)
 
     # put lengths in cell matrix
-    inds = zip(i,j)
-    X_k = np.zeros([Nx-1,Ny-1])
+    # inds = zip(i,j)
+    # print(inds)
+    # X_k = np.zeros([Nx-1,Ny-1])
+    # for ind_num in range(len(inds)):
+    #     i = inds[ind_num][0]
+    #     j = inds[ind_num][1]
+    #     X_k[i,j] = l[ind_num]
 
+    # inds = zip(j,i)
+    inds = zip(abs(j-(Ny-2)),i)
+    print(inds)
+    X_k = np.zeros([Ny-1,Nx-1])
     for ind_num in range(len(inds)):
-        i = inds[ind_num][0]
-        j = inds[ind_num][1]
-        X_k[i,j] = l[ind_num]
+        j = inds[ind_num][0]
+        i = inds[ind_num][1]
+        X_k[j,i] = l[ind_num]
 
     # printing
     if debug:
         print("inds: %s" % inds)
         print("X_k shape", X_k.shape)
-        for row in range(Nx-1):
-            # pprint.pprint(X_k[row,:])
-            print([round(X_k[row,i],2) for i in range(Ny-1)])
+        r = [x1,y1,x2,y2]
+        print("ray: %s" % r)
+        # print(X_k)
 
+        # for row in range(Nx-1):
+        #     pprint.pprint(X_k[row,:])
+        #     # print([round(X_k[row,i],2) for i in range(Ny-1)])
+        for row in range(Ny-1):
+            print([round(X_k[row,col],2) for col in range(Nx-1)])
+        print("==============================")
+        print("")
+        print("")
     # return X_k
     X_k = X_k.flatten()
     return X_k
@@ -189,7 +208,7 @@ def gen_grids(n_1, n_2):
     y_grid = 1.0*np.arange(-int(n_1/2), int(n_1/2)+1)
     return x_grid, y_grid
 
-def gen_eep(x_grid, y_grid, thetas):
+def gen_eep(x_grid, y_grid, thetas, debug=False):
     """
     purpose:
     ----------
@@ -223,13 +242,17 @@ def gen_eep(x_grid, y_grid, thetas):
             pp = [round(p,5) for p in pp]
             points.append(pp)
         else:
-            x_max = float(y_grid[-1]/m)
-            x_min = float(y_grid[0]/m)
+            x_max = float(y_grid[-1]/(m))
+            x_min = float(y_grid[0]/(m))
             y_max = float(y_grid[-1])
             y_min = float(y_grid[0])
             pp = [x_min, y_min, x_max, y_max]
             pp = [round(p,5) for p in pp]
             points.append(pp)
+    if debug:
+        print("=============== POINTS ===============")
+        print("points: %s " % points)
+        print("")
     return points
 
 def gen_X(n_1=None, n_2=None, m=None, sp_rep=False, debug=False):
@@ -261,7 +284,7 @@ def gen_X(n_1=None, n_2=None, m=None, sp_rep=False, debug=False):
     theta = np.linspace(0, np.pi, m+1)[0:m]
 
     ## compute entry/exit points on grid for each slope
-    eepoints = gen_eep(x_grid=xgrid, y_grid=ygrid, thetas=theta)
+    eepoints = gen_eep(x_grid=xgrid, y_grid=ygrid, thetas=theta, debug=debug)
 
     ## initialize X-ray transform matrix
     X = np.zeros([m, n_1*n_2])
@@ -274,5 +297,5 @@ def gen_X(n_1=None, n_2=None, m=None, sp_rep=False, debug=False):
         return(X)
 
 if __name__ == "__main__":
-    X = gen_X(n_1=8, n_2=4, m=3, sp_rep=False, debug=False)
+    X = gen_X(n_1=8, n_2=4, m=10, sp_rep=False, debug=True)
     print(X)
