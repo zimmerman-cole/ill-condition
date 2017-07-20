@@ -359,3 +359,42 @@ def cgs(n=500, max_iter=500, tol=0.1, cond_num=100):
     # plt.show()
 
     return final_err < init_err
+
+def system_solve():
+    brain = np.load('tomo2D/brain128.npy', 'r')
+    f = np.array(brain.flatten(order='F'))
+
+    X = drt.gen_X(n_1=128, n_2=128, m=128**2, sp_rep=1)
+
+    #print('PERCENT NON-ZERO: %f' % (len(np.argwhere(X != 0))  /  float(X.shape[0]*X.shape[1]))  )
+
+    g = X.dot(f)
+
+    # ==============================================================================
+    start_time = time.time()
+    cgs = optimize.ConjugateGradientsSolver(A=X.T.dot(X), b=X.T.dot(g), full_output=1)
+    fopt, n_iter, resids = cgs.solve()
+    cg_time = time.time() - start_time
+    print('Took %f sec' % cg_time)
+
+    cg_recon = fopt.reshape((128, 128))
+
+    print('final err: %f' % (la.norm(fopt - f) / la.norm(f)))
+
+
+    plt.plot([t for n,t in resids], [n for n,t in resids], marker='o')
+    plt.yscale('log')
+    plt.show()
+
+
+
+    # ==============================================================================
+    plt.figure()
+    plt.title('Original')
+    plt.imshow(brain)
+
+    plt.figure()
+    plt.title('Reconstructed')
+    plt.imshow(cg_recon)
+
+    plt.show()
