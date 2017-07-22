@@ -3,30 +3,31 @@ import numpy.linalg as la
 import scipy
 import scipy.sparse as sps
 import scipy.sparse.linalg as spsla
+import matplotlib.pyplot as plt
 
 def f_eval(A,b,x):
     f = 0.5*x.dot(A.dot(x)) - b.dot(x)
-    print(type(f))
     return f
 
 def btls(A, b, x, p, g, alpha=1, rho=0.1, c=0.9):
     """
     backtracking line-search:
-    alpha: initial trial step size
-    rho: decrement factor
-    c: additional decrease factor
+
+    Args:
+        alpha: initial trial step size
+        rho: decrement factor
+        c: additional decrease factor
     """
     f_curr = f_eval(A,b,x)
-    diff = 1
+    diff = 1.0
     i = 0
     while diff > 0:
-        x_proposed = x + alpha*p
+        x_proposed = x + alpha*np.copy(p)
+        x_proposed = x_proposed.reshape(len(x), )
         f_proposed = f_eval(A=A,b=b,x=x_proposed)
         f_compare = np.copy(f_curr) + c*alpha*g.dot(p)
         diff = f_proposed - f_compare
-        print("diff: %s" % diff)
         i += 1
-        print(i)
         alpha *= rho
         if alpha < 10**-16:
             print("alpha: machine precision reached")
@@ -84,34 +85,20 @@ def bfgs(A, b, H=None, tol=1.0, max_iter=500):
     residuals = [la.norm(gr)]
 
     while la.norm(gr) > tol:
-        print('Iter %d' % k)
+        #print('\n=============== OUTER Iter %d ==============' % k)
 
-        p = -H.dot(gr)          # search direction (6.18)
+        p = np.array(-H.dot(gr))   # search direction (6.18)
+
 
         # ===================================================
         # TODO: FIND BEST WAY TO DETERMINE STEP SIZE THAT
         # TODO: SATISFIES WOLFE CONDITIONS.
-        # # Find step size:
-        # a = 1.0
-        # x_new = x + (a * p)
-        # gr_new = A.dot(x) - b
-
-        # # Check Wolfe   (c1,c2 from Nocedal+Wright)
-        # n_tries = 1
-        # while not wolfe(a=a, c1=10**-4, c2=0.9, A=A, b=b, x=x, \
-        #                     x_new=x_new, p=p, gr=gr, gr_new=gr_new):
-        #     print('Wolfe try %d' % n_tries)
-        #     n_tries += 1
-        #
-        #     a *= 2
-        #     x_new = x + (a * p)
-        #     gr_new = A.dot(x) - b
-        x_new = x + btls(A=A,b=b,x=x,p=p,g=gr)*gr
+        x_new = x + btls(A=A,b=b,x=x,p=np.copy(p.reshape(n,)),g=gr)*gr
         x_new = x_new.reshape((n,))
-        print("x_new shape after update:", x_new.shape)
+        #print("x_new shape after update:", x_new.shape)
         gr_new = A.dot(x_new) - b
         gr_new = gr_new.reshape((n,))
-        print("gr_new shape after update:", gr_new.shape)
+        #print("gr_new shape after update:", gr_new.shape)
         residuals.append(la.norm(gr_new))
 
         # ===================================================
@@ -129,6 +116,8 @@ def bfgs(A, b, H=None, tol=1.0, max_iter=500):
         # ===================================================
         k += 1
         x, gr = x_new, gr_new
+        if k >= max_iter:
+            break
 
     return x, k, residuals
 
