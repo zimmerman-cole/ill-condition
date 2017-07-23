@@ -86,7 +86,8 @@ class Tester:
         self.A, self.b, self.x_0, self.x_true = [], [], [], []
         for sim in range(self.n_sims):
             self.A.append( util.psd_from_cond(self.cond_num,self.n) )
-            self.x_true.append( np.random.randn(self.n) )
+            # x_true: simple "box" shape 
+            self.x_true.append( np.array([100 if (0.4*self.n)<=i and i<(0.6*self.n) else 0 for i in range(self.n)]) )
             self.x_0.append( np.random.randn(self.n) )
             self.b.append( np.dot(self.A[sim],self.x_true[sim]) )
 

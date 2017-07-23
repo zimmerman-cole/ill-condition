@@ -64,6 +64,9 @@ def bfgs(A, b, H=None, tol=1.0, max_iter=500):
     """
     Page 140/Algorithm 6.1 in Nocedal and Wright.
     Also see the Implementation section on pages 142-143.
+
+    Algorithm currently makes all elements of x NEGATIVE, even though
+        the elements of x_true are all positive/zeros.
     """
     # =======================================================
     n = A.shape[0]          # A is symmetric (n x n)
@@ -72,6 +75,8 @@ def bfgs(A, b, H=None, tol=1.0, max_iter=500):
     else:
         iden = la.identity
 
+    # TODO: implement B for B != 1 once BFGS works
+    # Initialize H as BI
     if H is None:
         H = iden(n)
 
@@ -86,19 +91,33 @@ def bfgs(A, b, H=None, tol=1.0, max_iter=500):
 
     while la.norm(gr) > tol:
         #print('\n=============== OUTER Iter %d ==============' % k)
+        #print('num x>= 0: %d' % len(np.argwhere(x>=0)))
 
-        p = np.array(-H.dot(gr))   # search direction (6.18)
+        p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
 
+        # plt.figure()
+        # plt.title('P (SEARCH DIRECTION)')
+        # plt.plot(p, marker='o')
+        #
+        # plt.figure()
+        # plt.title('X ESTIMATE')
+        # plt.plot(x, marker='o')
+        #
+        # plt.figure()
+        # plt.title('GRADIENT')
+        # plt.plot(gr, marker='o')
+        #
+        # plt.show()
 
         # ===================================================
         # TODO: FIND BEST WAY TO DETERMINE STEP SIZE THAT
         # TODO: SATISFIES WOLFE CONDITIONS.
-        x_new = x + btls(A=A,b=b,x=x,p=np.copy(p.reshape(n,)),g=gr)*gr
-        x_new = x_new.reshape((n,))
-        #print("x_new shape after update:", x_new.shape)
+        a = btls(A=A,b=b,x=x,p=np.copy(p.reshape(n,)),g=gr)
+        #print('step size: %f' % a)
+        x_new = x + a*p
+        #print('num nx>=0: %d' % len(np.argwhere(x_new>=0)))
         gr_new = A.dot(x_new) - b
-        gr_new = gr_new.reshape((n,))
-        #print("gr_new shape after update:", gr_new.shape)
+
         residuals.append(la.norm(gr_new))
 
         # ===================================================
@@ -119,6 +138,8 @@ def bfgs(A, b, H=None, tol=1.0, max_iter=500):
         if k >= max_iter:
             break
 
+        #raw_input()
+
     return x, k, residuals
 
 if __name__ == "__main__":
@@ -132,6 +153,7 @@ if __name__ == "__main__":
     print('Final resid err: %f' % la.norm(g - X.dot(fopt)))
     print('Took %d iter' % n_iter)
 
-    plt.plot(residuals)
+    plt.plot(residuals, marker='o')
+    plt.title('RESIDUALS')
     plt.yscale('log')
     plt.show()

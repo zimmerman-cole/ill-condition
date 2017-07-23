@@ -113,26 +113,6 @@ def hanging_spd(cond_num, n=50, pct_good=0.80, drop=0.90, min_sing=None):
     # Sparse? instead of np.diag(s)
     return np.dot(B.T,B)
 
-
-def small_sing_vals(cond_num, m=50, n=50, max_sing=0.8):
-    """
-    Use to generate a matrix whose singular values all have magnitude less than
-    one.
-
-    NEED TO TEST THOROUGHLY.
-    """
-    if abs(max_sing) >= 1:
-        print('Spectral radius of this matrix will have magnitude >= 1. Are you sure?')
-
-    min_sing = max_sing / float(cond_num)
-    s = np.array(sorted([np.random.uniform(low=min_sing, high=max_sing) for _ in range(min(m,n)-2)] + [min_sing, max_sing], reverse=True))
-
-    A = np.random.randn(m, n)
-    u,_,v = la.svd(A, full_matrices=False)
-
-    # Sparse? instead of np.diag(s)
-    return np.dot(u, np.dot(np.diag(s), v))
-
 def psd_from_cond(cond_num, n=50, min_sing=None):
     """
     Generates a square SYMMETRIC matrix with specified condition number. Use this
@@ -268,10 +248,11 @@ def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, \
 
 def gen_data(n=100, cond_num=100):
     """
-    Returns SPD matrix A, solution x_true and RHS b (in Ax=b).
+    Returns SPD matrix A, solution x_true (box shape)
+        and RHS b (in Ax=b).
     """
     A = psd_from_cond(cond_num=cond_num, n=n)
-    x_true = 4 * np.random.randn(n)
+    x_true = np.array([100 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
     b = np.dot(A, x_true)
 
     return A, b, x_true
