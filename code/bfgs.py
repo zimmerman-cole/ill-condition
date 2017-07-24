@@ -6,6 +6,8 @@ import scipy.sparse.linalg as spsla
 import matplotlib.pyplot as plt
 import optimize, time
 
+
+
 def f_eval(A,b,x):
     f = 0.5*x.dot(A.dot(x)) - b.dot(x)
     return f
@@ -91,7 +93,7 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
 
     gr = A.dot(x) - b           # gradient
     # gr_norm = la.norm(gr)
-    residuals = [(la.norm(gr), time.time() - start_time)]
+    residuals = [(la.norm(gr), time.time() - start_time)] # residual = -gradient
 
     while la.norm(gr) > tol:
         p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
@@ -114,13 +116,9 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
         # COMPUTE Hk+1 BY MEANS OF (6.17)
         rho = 1.0 / np.inner(y.T, s)    # <== (6.14)
 
-        if sps.issparse(A):
-            H = ( iden(n) -rho*sps.coo_matrix(np.outer(s, y.T)) ).dot( H.dot( iden(n) - rho*sps.coo_matrix(np.outer(y, s.T)) ) )
-
-            H += rho * sps.coo_matrix(np.outer(s, s.T))     # <== (6.17) ^^
-        else:
-            H = ( iden(n) -rho*np.outer(s, y.T) ).dot( H.dot( iden(n) - rho*np.outer(y, s.T) ) )
-            H += rho * np.outer(s, s.T)
+        # NON-OPTIMIZED
+        #H = ( iden(n) -rho*np.outer(s, y.T) ).dot( H.dot( iden(n) - rho*np.outer(y, s.T) ) )
+        #H += rho * np.outer(s, s.T)
 
 
         # ===================================================
@@ -133,6 +131,9 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
     return x, k, residuals, exes
 
 class BFGSSolver(optimize.Solver):
+    """
+    Unfinished
+    """
 
     def __str__(self):
         l1 = 'BFGS Solver\n'

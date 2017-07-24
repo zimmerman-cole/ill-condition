@@ -456,7 +456,7 @@ def x_visual(n=100):
 
 def bfgs_resids(n=100):
     """
-    BFGS residuals and CG/GD residuals.
+    BFGS residuals and CG residuals.
 
     Plots residual norms vs time at each iteration.
     """
@@ -471,33 +471,34 @@ def bfgs_resids(n=100):
     b = A.dot(x_true)
     # =============================================
     # Initialize solvers/get resids ===============
-    gds = optimize.GradientDescentSolver(A=A, b=b, full_output=1)
-    gd_x, gd_nit, gd_resid = gds.solve(max_iter=1000)
+    st_time = time.time()
     cgs = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=1)
     cg_x, cg_nit, cg_resid = cgs.solve(max_iter=1000)
+    cg_time = time.time() - st_time
+    print('CG took %f sec' % cg_time)
 
+    st_time = time.time()
     b_x, b_k, b_resid, b_path = bfgs.bfgs(A=A, b=b, B=3.0, max_iter=1000)
+    b_time = time.time() - st_time
+    print('BFGS took %f sec' % b_time)
+
+    print('Ratio: %f\n\n' % (b_time / cg_time))
     # =============================================
 
     print('num. iterations per solver: ')
-    print('GD: %d   CG: %d  BFGS: %d' % (gd_nit, cg_nit, b_k))
+    print('CG: %d  BFGS: %d' % (cg_nit, b_k))
     print('final residual errors per solver:')
-    gd_err, cg_err = norm_dif(gd_x, A, b), norm_dif(cg_x, A, b)
+    cg_err = norm_dif(cg_x, A, b)
     b_err = norm_dif(b_x, A, b)
-    print('GD: %f   CG: %f  BFGS: %f' % (gd_err, cg_err, b_err) )
+    print('CG: %f  BFGS: %f' % (cg_err, b_err) )
 
-    leg = ['CG', 'BFGS']
     plt.xlabel('Time')
     plt.ylabel('Residual Norm')
-    if not(gd_err > 10**8 or gd_err == float('inf') or gd_err != gd_err):
-        # sometimes GD blows up for some reason
-        plt.plot([t for n,t in gd_resid], [n for n,t in gd_resid], marker='o')
-        leg.insert(0, 'GD')
 
     plt.plot([t for n,t in cg_resid], [n for n,t in cg_resid], marker='o')
     plt.plot([t for n,t in b_resid], [n for n,t in b_resid], marker='o')
 
-    plt.legend(leg)
+    plt.legend(['CG', 'BFGS'])
     plt.show()
 
 def bfgs_visual(n=100):
