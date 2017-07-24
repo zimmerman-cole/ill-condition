@@ -4,6 +4,7 @@ import scipy
 import scipy.sparse as sps
 import scipy.sparse.linalg as spsla
 import matplotlib.pyplot as plt
+import optimize, time
 
 def f_eval(A,b,x):
     f = 0.5*x.dot(A.dot(x)) - b.dot(x)
@@ -86,9 +87,11 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
     x = np.zeros(n)
     exes = [x]
 
+    start_time = time.time()
+
     gr = A.dot(x) - b           # gradient
     # gr_norm = la.norm(gr)
-    residuals = [la.norm(gr)]
+    residuals = [(la.norm(gr), time.time() - start_time)]
 
     while la.norm(gr) > tol:
         p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
@@ -100,7 +103,7 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
         x_new = x + a*p
         gr_new = A.dot(x_new) - b
 
-        residuals.append(la.norm(gr_new))
+        residuals.append((la.norm(gr_new), time.time() - start_time))
 
         # ===================================================
 
@@ -111,8 +114,13 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
         # COMPUTE Hk+1 BY MEANS OF (6.17)
         rho = 1.0 / np.inner(y.T, s)    # <== (6.14)
 
-        H = ( iden(n) -rho*np.outer(s, y.T) ).dot( H.dot( iden(n) - rho*np.outer(y, s.T) ) )
-        H += rho * np.outer(s, s.T)     # <== (6.17) ^^
+        if sps.issparse(A):
+            H = ( iden(n) -rho*sps.coo_matrix(np.outer(s, y.T)) ).dot( H.dot( iden(n) - rho*sps.coo_matrix(np.outer(y, s.T)) ) )
+
+            H += rho * sps.coo_matrix(np.outer(s, s.T))     # <== (6.17) ^^
+        else:
+            H = ( iden(n) -rho*np.outer(s, y.T) ).dot( H.dot( iden(n) - rho*np.outer(y, s.T) ) )
+            H += rho * np.outer(s, s.T)
 
 
         # ===================================================
@@ -123,6 +131,51 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
             break
 
     return x, k, residuals, exes
+
+class BFGSSolver(optimize.Solver):
+
+    def __str__(self):
+        l1 = 'BFGS Solver\n'
+        if self.A is None:
+            l2 = 'A: None; '
+        else:
+            l2 = 'A: %d x %d; ' % (self.A.shape[0], self.A.shape[1])
+        if self.b is None:
+            l2 += 'b: None\n'
+        else:
+            l2 += 'b: %d x %d\n' % (len(self.b), len(self.b.T))
+        if self.full_output:
+            l3 = 'full_output: True'
+        else:
+            l3 = 'full_output: False'
+        return l1+l2+l3
+
+    def _check_ready(self):
+        """
+        Ensure A is square, dimensions line up w/ b.
+
+        """
+
+        assert self.A.shape[0] == self.A.shape[1]
+        assert b.shape == (A.shape[0], )
+
+
+    def _full(self, tol, x, max_iter, x_true, **kwargs):
+        n = self.A.shape[0]          # A is symmetric (n x n)
+        if sps.issparse(self.A):
+            iden = sps.eye
+        else:
+            iden = np.identity
+
+        if 'H' not in kwargs:
+            if 'B' not in kwargs:
+                B = 1.0
+
+            H = B * iden(n) # inverse Hessian approximation
+
+        k = 0
+
+
 
 if __name__ == "__main__":
 

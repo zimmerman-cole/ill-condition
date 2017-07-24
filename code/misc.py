@@ -405,7 +405,6 @@ def system_solve():
 def x_visual(n=100):
     """
     Plot x estimates from various solvers at each (every 10) iteration(s).
-        TODO: Needs major cleaning up.
     """
 
     # Formulate problem ===========================
@@ -422,7 +421,7 @@ def x_visual(n=100):
     cgs = optimize.ConjugateGradientsSolver(A=A, b=b)
     cg_path = cgs.path(max_iter=1000)
 
-    b_x, b_k, b_re, b_path = bfgs.bfgs(A=A, b=b, max_iter=1000)
+    b_x, b_k, b_re, b_path = bfgs.bfgs(A=A, b=b, B=2.0, max_iter=1000)
     # =============================================
 
     print('num. iterations per solver: ')
@@ -433,22 +432,123 @@ def x_visual(n=100):
     print('GD: %f   CG: %f  BFGS: %f' % (gd_err, cg_err, b_err) )
 
 
+
     for i in range(max(len(gd_path), len(cg_path), len(b_path))):
         if (i%10): continue     # only plot every 10th x
-        leg = ['x_true']
+        leg = ['x_true: NA']
         plt.plot(x_true, marker='o', color='blue')
 
         if i < len(gd_path):
-            leg.append('GD')
+            leg.append('GD: %.1f' % norm_dif(gd_path[i], A, b))
             plt.plot(gd_path[i], marker='o', color='red')
 
         if i < len(cg_path):
-            leg.append('CG')
+            leg.append('CG: %.1f' % norm_dif(cg_path[i], A, b))
             plt.plot(cg_path[i], marker='o', color='green')
 
         if i < len(b_path):
-            leg.append('BFGS')
+            leg.append('BFGS: %.1f' % norm_dif(b_path[i], A, b))
             plt.plot(b_path[i], marker='o', color='purple')
 
         plt.legend(leg)
+        plt.ylim((-10, 60))
         plt.show()
+
+def bfgs_resids(n=100):
+    """
+    BFGS residuals and CG/GD residuals.
+
+    Plots residual norms vs time at each iteration.
+    """
+
+    # Formulate problem ===========================
+    A = sps.random(n, n)
+    A = A.T.dot(A)      # make positive-definite
+    # A = util.psd_from_cond(cond_num=1000, n=n)
+
+    # "box"-shaped true x
+    x_true = np.array([50 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
+    b = A.dot(x_true)
+    # =============================================
+    # Initialize solvers/get resids ===============
+    gds = optimize.GradientDescentSolver(A=A, b=b, full_output=1)
+    gd_x, gd_nit, gd_resid = gds.solve(max_iter=1000)
+    cgs = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=1)
+    cg_x, cg_nit, cg_resid = cgs.solve(max_iter=1000)
+
+    b_x, b_k, b_resid, b_path = bfgs.bfgs(A=A, b=b, B=3.0, max_iter=1000)
+    # =============================================
+
+    print('num. iterations per solver: ')
+    print('GD: %d   CG: %d  BFGS: %d' % (gd_nit, cg_nit, b_k))
+    print('final residual errors per solver:')
+    gd_err, cg_err = norm_dif(gd_x, A, b), norm_dif(cg_x, A, b)
+    b_err = norm_dif(b_x, A, b)
+    print('GD: %f   CG: %f  BFGS: %f' % (gd_err, cg_err, b_err) )
+
+    leg = ['CG', 'BFGS']
+    plt.xlabel('Time')
+    plt.ylabel('Residual Norm')
+    if not(gd_err > 10**8 or gd_err == float('inf') or gd_err != gd_err):
+        # sometimes GD blows up for some reason
+        plt.plot([t for n,t in gd_resid], [n for n,t in gd_resid], marker='o')
+        leg.insert(0, 'GD')
+
+    plt.plot([t for n,t in cg_resid], [n for n,t in cg_resid], marker='o')
+    plt.plot([t for n,t in b_resid], [n for n,t in b_resid], marker='o')
+
+    plt.legend(leg)
+    plt.show()
+
+def bfgs_visual(n=100):
+    """
+    Plot x estimates from BFGS run w/ various B.
+    Use to find optimal B.
+    """
+
+    # Formulate problem ===========================
+    A = sps.random(n, n)
+    A = A.T.dot(A)      # make positive-definite
+
+    # "box"-shaped true x
+    x_true = np.array([50 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
+    b = A.dot(x_true)
+    # =============================================
+    # Run BFGS w/ various B =======================
+    B_range = [float(B) for B in range(1, 11)]
+    paths = dict()
+
+    for B in B_range:
+
+        _, _, _, b_path = bfgs.bfgs(A=A, b=b, B=B, max_iter=1000)
+        paths[B] = b_path
+    # =============================================
+
+    print('num. iterations per B:')
+    print([str(B)+': '+str(len(paths[B])) for B in B_range])
+    print('final residual errors per B:')
+    print([str(B)+': '+str(norm_dif(paths[B][-1], A, b)) for B in B_range])
+
+
+
+    #
+    # for i in range(max(len(gd_path), len(cg_path), len(b_path))):
+    #     if (i%10): continue     # only plot every 10th x
+    #     leg = ['x_true: NA']
+    #     plt.plot(x_true, marker='o', color='blue')
+    #
+    #     if i < len(gd_path):
+    #         leg.append('GD: %.1f' % norm_dif(gd_path[i], A, b))
+    #         plt.plot(gd_path[i], marker='o', color='red')
+    #
+    #     if i < len(cg_path):
+    #         leg.append('CG: %.1f' % norm_dif(cg_path[i], A, b))
+    #         plt.plot(cg_path[i], marker='o', color='green')
+    #
+    #     if i < len(b_path):
+    #         leg.append('BFGS: %.1f' % norm_dif(b_path[i], A, b))
+    #         plt.plot(b_path[i], marker='o', color='purple')
+    #
+    #     plt.legend(leg)
+    #     plt.ylim((-10, 60))
+    #     plt.show()
