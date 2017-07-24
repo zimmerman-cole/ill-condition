@@ -2,6 +2,8 @@ import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
 import time, optimize, util
+import scipy, bfgs
+import scipy.sparse as sps
 
 """
 Temporary holding place for stuff /// stuff that doesn't fit anywhere else.
@@ -13,7 +15,7 @@ def norm_dif(x, *args):
     Return || b - Ax || (Frobenius norm).
     """
     A, b = args
-    return la.norm(b - np.dot(A, x))
+    return la.norm(b - A.dot(x))
 
 def compare_gd():
     """
@@ -398,3 +400,55 @@ def system_solve():
     plt.imshow(cg_recon)
 
     plt.show()
+
+# TODO: Needs major cleaning up.
+def x_visual(n=100):
+    """
+    Plot x estimates from various solvers at each (every 10) iteration(s).
+        TODO: Needs major cleaning up.
+    """
+
+    # Formulate problem ===========================
+    A = sps.random(n, n)
+    A = A.T.dot(A)      # make positive-definite
+
+    # "box"-shaped true x
+    x_true = np.array([50 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
+    b = A.dot(x_true)
+    # =============================================
+    # Initialize solvers/get paths ================
+    gds = optimize.GradientDescentSolver(A=A, b=b)
+    gd_path = gds.path(max_iter=1000)
+    cgs = optimize.ConjugateGradientsSolver(A=A, b=b)
+    cg_path = cgs.path(max_iter=1000)
+
+    b_x, b_k, b_re, b_path = bfgs.bfgs(A=A, b=b, max_iter=1000)
+    # =============================================
+
+    print('num. iterations per solver: ')
+    print('GD: %d   CG: %d  BFGS: %d' % (len(gd_path), len(cg_path), len(b_path)))
+    print('final residual errors per solver:')
+    gd_err, cg_err = norm_dif(gd_path[-1], A, b), norm_dif(cg_path[-1], A, b)
+    b_err = norm_dif(b_path[-1], A, b)
+    print('GD: %f   CG: %f  BFGS: %f' % (gd_err, cg_err, b_err) )
+
+
+    for i in range(max(len(gd_path), len(cg_path), len(b_path))):
+        if (i%10): continue     # only plot every 10th x
+        leg = ['x_true']
+        plt.plot(x_true, marker='o', color='blue')
+
+        if i < len(gd_path):
+            leg.append('GD')
+            plt.plot(gd_path[i], marker='o', color='red')
+
+        if i < len(cg_path):
+            leg.append('CG')
+            plt.plot(cg_path[i], marker='o', color='green')
+
+        if i < len(b_path):
+            leg.append('BFGS')
+            plt.plot(b_path[i], marker='o', color='purple')
+
+        plt.legend(leg)
+        plt.show()

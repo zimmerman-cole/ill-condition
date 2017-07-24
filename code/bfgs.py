@@ -60,7 +60,7 @@ def wolfe(a, c1, c2, A, b, x, x_new, p, gr, gr_new):
 
     return lhs <= rhs
 
-def bfgs(A, b, H=None, tol=1.0, max_iter=500):
+def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
     """
     Page 140/Algorithm 6.1 in Nocedal and Wright.
     Also see the Implementation section on pages 142-143.
@@ -73,49 +73,31 @@ def bfgs(A, b, H=None, tol=1.0, max_iter=500):
     if sps.issparse(A):
         iden = sps.eye
     else:
-        iden = la.identity
+        iden = np.identity
 
     # TODO: implement B for B != 1 once BFGS works
     # Initialize H as BI
     if H is None:
-        H = iden(n)
+        H = B * iden(n)     # inverse Hessian approximation H0
 
     # =======================================================
 
     k = 0
     x = np.zeros(n)
+    exes = [x]
 
     gr = A.dot(x) - b           # gradient
     # gr_norm = la.norm(gr)
     residuals = [la.norm(gr)]
 
     while la.norm(gr) > tol:
-        #print('\n=============== OUTER Iter %d ==============' % k)
-        #print('num x>= 0: %d' % len(np.argwhere(x>=0)))
-
         p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
-
-        # plt.figure()
-        # plt.title('P (SEARCH DIRECTION)')
-        # plt.plot(p, marker='o')
-        #
-        # plt.figure()
-        # plt.title('X ESTIMATE')
-        # plt.plot(x, marker='o')
-        #
-        # plt.figure()
-        # plt.title('GRADIENT')
-        # plt.plot(gr, marker='o')
-        #
-        # plt.show()
 
         # ===================================================
         # TODO: FIND BEST WAY TO DETERMINE STEP SIZE THAT
         # TODO: SATISFIES WOLFE CONDITIONS.
         a = btls(A=A,b=b,x=x,p=np.copy(p.reshape(n,)),g=gr)
-        #print('step size: %f' % a)
         x_new = x + a*p
-        #print('num nx>=0: %d' % len(np.argwhere(x_new>=0)))
         gr_new = A.dot(x_new) - b
 
         residuals.append(la.norm(gr_new))
@@ -132,15 +114,15 @@ def bfgs(A, b, H=None, tol=1.0, max_iter=500):
         H = ( iden(n) -rho*np.outer(s, y.T) ).dot( H.dot( iden(n) - rho*np.outer(y, s.T) ) )
         H += rho * np.outer(s, s.T)     # <== (6.17) ^^
 
+
         # ===================================================
         k += 1
         x, gr = x_new, gr_new
+        exes.append(x)
         if k >= max_iter:
             break
 
-        #raw_input()
-
-    return x, k, residuals
+    return x, k, residuals, exes
 
 if __name__ == "__main__":
 
