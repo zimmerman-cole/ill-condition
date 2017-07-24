@@ -8,3 +8,6 @@
 
 - problem
 	- problem notes and writeup - https://www.overleaf.com/10315281fcttmvzpfpgj
+	
+- ipm
+	- ipm notes and writeup - https://www.overleaf.com/10421743dttprnrfrxcf
