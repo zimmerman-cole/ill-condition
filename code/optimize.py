@@ -433,6 +433,7 @@ class GradientDescentSolver(Solver):
 
             # If not, take another step
             Ar = self.A.dot(r)
+            a = np.inner(r.T, r) / np.dot(r.T, Ar)
             x += a * r
 
         if x_true is None:
@@ -474,6 +475,7 @@ class GradientDescentSolver(Solver):
 
             # If not, take another step
             Ar = self.A.dot(r)
+            a = np.inner(r.T, r) / np.dot(r.T, Ar)
             x += a * r
 
         return x
@@ -522,6 +524,7 @@ class GradientDescentSolver(Solver):
 
             # If not, take another step
             Ar = self.A.dot(r)
+            a = np.inner(r.T, r) / np.dot(r.T, Ar)
             x += a * r
             path.append(np.copy(x))
 

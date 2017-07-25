@@ -9,12 +9,18 @@ import optimize, time
 
 
 def f_eval(A,b,x):
+    """
+    Objective function f(x) = (1/2)(x.T A x) - (b.T x)
+    """
     f = 0.5*x.dot(A.dot(x)) - b.dot(x)
     return f
 
 def btls(A, b, x, p, g, alpha=1, rho=0.1, c=0.9):
     """
-    backtracking line-search:
+    Backtracking line-search. Takes small/conservative
+        steps.
+    Does NOT guarantee the sufficient decrease condition
+        (3.6a from Nocedal+Wright) is satisfied.
 
     Args:
         alpha: initial trial step size
@@ -78,7 +84,6 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
     else:
         iden = np.identity
 
-    # TODO: implement B for B != 1 once BFGS works
     # Initialize H as BI
     if H is None:
         H = B * iden(n)     # inverse Hessian approximation H0
@@ -102,20 +107,21 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
         # p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
 
         # ===================================================
-        # TODO: FIND BEST WAY TO DETERMINE STEP SIZE THAT
-        # TODO: SATISFIES WOLFE CONDITIONS.
-        a = btls(A=A,b=b,x=x,p=np.copy(p.reshape(n,)),g=gr)
+        # TODO: Best way to det. step size
+        # TODO: DAMPED BFGS (for when curvature doesn't change much)
+        #a = btls(A=A,b=b,x=x,p=np.copy(p.reshape(n,)),g=gr)
+        a = 1.0
         x_new = x + a*p
         gr_new = A.dot(x_new) - b
 
         residuals.append((la.norm(gr_new), time.time() - start_time))
 
         # ===================================================
-
+        # Calculate x-step, gradient-change
         s = x_new - x
         y = gr_new - gr
         # ===================================================
-
+        # Update your inverse Hessian approximation
         # COMPUTE Hk+1 BY MEANS OF (6.17)
         rho = 1.0 / np.inner(y.T, s)    # <== (6.14)
 
@@ -125,19 +131,20 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
 
         # OPTIMIZED
         Hy = H.dot(y)
-        # print("Hy", Hy.shape)
         Hy = np.array(Hy).reshape(n,)
-        # print("Hy again", Hy.shape)
         yHy = y.dot(Hy)
-        # print("yHy", yHy.shape)
         HysT = np.outer(Hy,s)
-        # print("HysT", HysT.shape)
         rssT = rho*np.outer(s,s)
-        # print("rssT", rssT.shape)
 
         H = H - rho*HysT - rho*HysT.T + rho*yHy*rssT + rssT
+
+        # ===================================================
+        # Then calculate your new search direction
         p = -H.dot(gr_new)
         p = np.array(p).reshape(n,)
+
+
+
 
 
 
@@ -201,15 +208,16 @@ class BFGSSolver(optimize.Solver):
 if __name__ == "__main__":
 
     X = sps.random(m=100, n=100, density=0.02)
+    X = X.T.dot(X)
     f_true = np.array([50 if 40<=i and i<60 else 0 for i in range(100)])
     g = X.dot(f_true)
 
     print('Init resid err: %f' % la.norm(g - X.dot(np.zeros(100))))
-    fopt, n_iter, residuals = bfgs(A=X, b=g)
+    fopt, n_iter, residuals, exes = bfgs(A=X, b=g, B=2.0)
     print('Final resid err: %f' % la.norm(g - X.dot(fopt)))
     print('Took %d iter' % n_iter)
 
-    plt.plot(residuals, marker='o')
+    plt.plot([t for n,t in residuals], [n for n,t in residuals], marker='o')
     plt.title('RESIDUALS')
     plt.yscale('log')
     plt.show()
