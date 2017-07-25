@@ -5,6 +5,8 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as spsla
 import matplotlib.pyplot as plt
 import optimize, time
+import tomo2D, sys
+from tomo2D import drt as drt
 
 
 
@@ -73,9 +75,6 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
     """
     Page 140/Algorithm 6.1 in Nocedal and Wright.
     Also see the Implementation section on pages 142-143.
-
-    Algorithm currently makes all elements of x NEGATIVE, even though
-        the elements of x_true are all positive/zeros.
     """
     # =======================================================
     n = A.shape[0]          # A is symmetric (n x n)
@@ -100,13 +99,11 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
 
     gr = A.dot(x) - b           # gradient
     gr_norm = la.norm(gr)
-    residuals = [(gr_norm, time.time() - start_time)] # residual = -gradient
+    residuals = [(gr_norm, time.time() - start_time)]   # residual = -gradient
     # OPTIMIZED
-    p = np.array(-H.dot(gr)).reshape(n, )
+    p = np.array(-H.dot(gr)).reshape(n, )   # (6.18) search direction
 
     while gr_norm > tol:
-        # NON-OPTIMIZED
-        # p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
 
         # ===================================================
         # TODO: Best way to det. step size
@@ -134,10 +131,6 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
         # COMPUTE Hk+1 BY MEANS OF (6.17)
         rho = 1.0 / np.inner(y.T, s)    # <== (6.14)
 
-        # NON-OPTIMIZED
-        # H = ( iden(n) -rho*np.outer(s, y.T) ).dot( H.dot( iden(n) - rho*np.outer(y, s.T) ) )
-        # H += rho * np.outer(s, s.T)
-
         # OPTIMIZED
         Hy = H.dot(y)
         #print(Hy.shape, type(Hy))
@@ -154,10 +147,6 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
         p = np.array(p).reshape(n,)
 
 
-
-
-
-
         # ===================================================
         k += 1
         x, gr = x_new, gr_new
@@ -169,6 +158,48 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
         return x, k, residuals, exes
     else:
         return x, k, residuals, exes, x_difs
+
+# BFGS
+def bfgs_system(n=100, m=100):
+    """
+    Test BFGS (vs. GD and CG) on "realistic" sparse system matrix.
+
+    (int)   m:  number of rays to fire
+    (int)   n:  image is (n x n) pixels
+
+    Solves the system Xf=g, where
+        X:  (m   , n**2)
+        f:  (n**2,     )
+        g:  (m   ,     )
+    """
+    X = drt.gen_X(n_1=n, n_2=n, m=m, sp_rep=1)
+    X = sps.csr_matrix(X.T.dot(X))
+
+    f_true = np.array([100 if (0.4*(n**2))<=i and i<(0.6*(n**2)) else 0 for i in range(n**2)])
+    g = X.dot(f_true)
+
+    print('Init resid err: %f' % la.norm(g - X.dot(np.zeros(n**2))))
+    fopt, n_iter, b_resids, exes = bfgs(A=X, b=g, B=2.0, max_iter=1000)
+    print('BFGS final resid err: %f' % la.norm(g - X.dot(fopt)))
+    print('BFGS took %d iter' % n_iter)
+
+    cgs = optimize.ConjugateGradientsSolver(A=X, b=g, full_output=1)
+    fopt, n_iter, cg_resids = cgs.solve(max_iter=1000)
+    print('CG final resid err: %f' % la.norm(g - X.dot(fopt)))
+    print('CG took %d iter' % n_iter)
+
+    gds = optimize.GradientDescentSolver(A=X, b=g, full_output=1)
+    fopt, n_iter, gd_resids = gds.solve(max_iter=1000)
+    print('GD final resid err: %f' % la.norm(g - X.dot(fopt)))
+    print('GD took %d iter' % n_iter)
+
+    plt.plot([t for n,t in b_resids], [n for n,t in b_resids], marker='o')
+    plt.plot([t for n,t in cg_resids], [n for n,t in cg_resids], marker='o')
+    plt.plot([t for n,t in gd_resids], [n for n,t in gd_resids], marker='o')
+    plt.title('RESIDUALS')
+    plt.yscale('log')
+    plt.legend(['BFGS', 'CG', 'GD'])
+    plt.show()
 
 class BFGSSolver(optimize.Solver):
     """
@@ -219,18 +250,4 @@ class BFGSSolver(optimize.Solver):
 
 
 if __name__ == "__main__":
-
-    X = sps.random(m=100, n=100, density=0.02)
-    X = X.T.dot(X)
-    f_true = np.array([50 if 40<=i and i<60 else 0 for i in range(100)])
-    g = X.dot(f_true)
-
-    print('Init resid err: %f' % la.norm(g - X.dot(np.zeros(100))))
-    fopt, n_iter, residuals, exes = bfgs(A=X, b=g, B=2.0)
-    print('Final resid err: %f' % la.norm(g - X.dot(fopt)))
-    print('Took %d iter' % n_iter)
-
-    plt.plot([t for n,t in residuals], [n for n,t in residuals], marker='o')
-    plt.title('RESIDUALS')
-    plt.yscale('log')
-    plt.show()
+    bfgs_system()

@@ -173,7 +173,7 @@ def siddon_algorithm(x1, y1, x2, y2, x_grid, y_grid, debug=False):
 
     # inds = zip(j,i)
     inds = zip(abs(j-(Ny-2)),i)
-    print(inds)
+    #print(inds)
     X_k = np.zeros([Ny-1,Nx-1])
     for ind_num in range(len(inds)):
         j = inds[ind_num][0]
