@@ -5,7 +5,7 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as spsla
 import matplotlib.pyplot as plt
 import optimize, time
-import tomo2D, sys
+import sys
 from tomo2D import drt as drt
 
 
@@ -75,6 +75,10 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
     """
     Page 140/Algorithm 6.1 in Nocedal and Wright.
     Also see the Implementation section on pages 142-143.
+
+    Doesn't do to well on large systems:
+        8+ matrix-vector ops per iteration, many of which involve
+        the very dense inverse Hessian approximation H.
     """
     # =======================================================
     n = A.shape[0]          # A is symmetric (n x n)
@@ -159,7 +163,7 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
     else:
         return x, k, residuals, exes, x_difs
 
-# BFGS
+# Test BFGS on "realistic" system matrix
 def bfgs_system(n=100, m=100):
     """
     Test BFGS (vs. GD and CG) on "realistic" sparse system matrix.
@@ -198,8 +202,26 @@ def bfgs_system(n=100, m=100):
     plt.plot([t for n,t in gd_resids], [n for n,t in gd_resids], marker='o')
     plt.title('RESIDUALS')
     plt.yscale('log')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Residual norm')
     plt.legend(['BFGS', 'CG', 'GD'])
     plt.show()
+
+def l_bfgs(A, b, m=10, tol=10**-5, max_iter=500, x_true=None):
+    """
+    Limited-memory BFGS (Nocedal and Wright pg. 177).
+
+    Based off algorithms 7.5 (& 7.4) from N and W.
+
+
+    """
+    n = A.shape[0]
+    x = np.zeros(n,)
+
+    # Do first iteration outside loop
+    H = sps.eye(n)
+
+
 
 class BFGSSolver(optimize.Solver):
     """

@@ -454,18 +454,21 @@ def x_visual(n=100):
         plt.ylim((-10, 60))
         plt.show()
 
-def bfgs_resids(n=100, plot='residuals'):
+def bfgs_resids(n=100, plot='residuals', sparse=0):
     """
     BFGS residuals and CG residuals.
 
     Plots residual norms vs time at each iteration.
+
+    Set sparse=True if you want A to be a scipy-sparse matrix.
     """
 
     # Formulate problem ===========================
-    #A = sps.random(n, n)
-    #A = A.T.dot(A)      # make positive-definite
-    # A = util.psd_from_cond(cond_num=1000, n=n)
-    A = util.psd_from_cond(cond_num=10**8, n=n)
+    if sparse:
+        A = sps.random(n, n)
+        A = A.T.dot(A)      # make positive-definite
+    else:
+        A = util.psd_from_cond(cond_num=10**8, n=n)
 
     # "box"-shaped true x
     #x_true = np.array([50 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
