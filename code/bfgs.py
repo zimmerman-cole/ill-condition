@@ -94,9 +94,12 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
     gr = A.dot(x) - b           # gradient
     # gr_norm = la.norm(gr)
     residuals = [(la.norm(gr), time.time() - start_time)] # residual = -gradient
+    # OPTIMIZED
+    p = np.array(-H.dot(gr)).reshape(n, )
 
     while la.norm(gr) > tol:
-        p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
+        # NON-OPTIMIZED
+        # p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
 
         # ===================================================
         # TODO: FIND BEST WAY TO DETERMINE STEP SIZE THAT
@@ -117,8 +120,25 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
         rho = 1.0 / np.inner(y.T, s)    # <== (6.14)
 
         # NON-OPTIMIZED
-        #H = ( iden(n) -rho*np.outer(s, y.T) ).dot( H.dot( iden(n) - rho*np.outer(y, s.T) ) )
-        #H += rho * np.outer(s, s.T)
+        # H = ( iden(n) -rho*np.outer(s, y.T) ).dot( H.dot( iden(n) - rho*np.outer(y, s.T) ) )
+        # H += rho * np.outer(s, s.T)
+
+        # OPTIMIZED
+        Hy = H.dot(y)
+        # print("Hy", Hy.shape)
+        Hy = np.array(Hy).reshape(n,)
+        # print("Hy again", Hy.shape)
+        yHy = y.dot(Hy)
+        # print("yHy", yHy.shape)
+        HysT = np.outer(Hy,s)
+        # print("HysT", HysT.shape)
+        rssT = rho*np.outer(s,s)
+        # print("rssT", rssT.shape)
+
+        H = H - rho*HysT - rho*HysT.T + rho*yHy*rssT + rssT
+        p = -H.dot(gr_new)
+        p = np.array(p).reshape(n,)
+
 
 
         # ===================================================
