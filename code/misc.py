@@ -454,7 +454,7 @@ def x_visual(n=100):
         plt.ylim((-10, 60))
         plt.show()
 
-def bfgs_resids(n=100):
+def bfgs_resids(n=100, plot='residuals'):
     """
     BFGS residuals and CG residuals.
 
@@ -462,43 +462,62 @@ def bfgs_resids(n=100):
     """
 
     # Formulate problem ===========================
-    A = sps.random(n, n)
-    A = A.T.dot(A)      # make positive-definite
+    #A = sps.random(n, n)
+    #A = A.T.dot(A)      # make positive-definite
     # A = util.psd_from_cond(cond_num=1000, n=n)
+    A = util.psd_from_cond(cond_num=10**8, n=n)
 
     # "box"-shaped true x
-    x_true = np.array([50 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
+    #x_true = np.array([50 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
+    x_true = np.random.randn(n, )
     b = A.dot(x_true)
     # =============================================
     # Initialize solvers/get resids ===============
     st_time = time.time()
     cgs = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=1)
-    cg_x, cg_nit, cg_resid = cgs.solve(max_iter=1000)
+    cg_x, cg_nit, cg_resid, cg_errs = cgs.solve(max_iter=1000, x_true=x_true)
     cg_time = time.time() - st_time
     print('CG took %f sec' % cg_time)
 
     st_time = time.time()
-    b_x, b_k, b_resid, b_path = bfgs.bfgs(A=A, b=b, B=3.0, max_iter=1000)
+    gds = optimize.GradientDescentSolver(A=A, b=b, full_output=1)
+    gd_x, gd_nit, gd_resid, gd_errs = gds.solve(max_iter=1000, x_true=x_true)
+    gd_time = time.time() - st_time
+    print('GD took %f sec' % gd_time)
+
+    st_time = time.time()
+    b_x, b_k, b_resid, b_path, b_errs = bfgs.bfgs(A=A, b=b, B=3.0, max_iter=1000, x_true=x_true)
     b_time = time.time() - st_time
     print('BFGS took %f sec' % b_time)
 
-    print('Ratio: %f\n\n' % (b_time / cg_time))
+    print('BFGS:CG time ratio: %f\n\n' % (b_time / cg_time))
     # =============================================
 
     print('num. iterations per solver: ')
-    print('CG: %d  BFGS: %d' % (cg_nit, b_k))
+    print('CG: %d  GD: %d   BFGS: %d' % (cg_nit, gd_nit, b_k))
     print('final residual errors per solver:')
     cg_err = norm_dif(cg_x, A, b)
+    gd_err = norm_dif(gd_x, A, b)
     b_err = norm_dif(b_x, A, b)
-    print('CG: %f  BFGS: %f' % (cg_err, b_err) )
+    print('CG: %f  GD: %f   BFGS: %f' % (cg_err, gd_err, b_err) )
 
     plt.xlabel('Time')
-    plt.ylabel('Residual Norm')
+    plt.yscale('log')
 
-    plt.plot([t for n,t in cg_resid], [n for n,t in cg_resid], marker='o')
-    plt.plot([t for n,t in b_resid], [n for n,t in b_resid], marker='o')
+    if plot == 'residuals':
+        plt.ylabel('Residual Norm')
+        plt.plot([t for n,t in cg_resid], [n for n,t in cg_resid], marker='o')
+        plt.plot([t for n,t in gd_resid], [n for n,t in gd_resid], marker='o')
+        plt.plot([t for n,t in b_resid], [n for n,t in b_resid], marker='o')
+    elif plot=='errors':
+        plt.ylabel('Error Norm')
+        plt.plot([t for n,t in cg_resid], cg_errs, marker='o')
+        plt.plot([t for n,t in gd_resid], gd_errs, marker='o')
+        plt.plot([t for n,t in b_resid], b_errs, marker='o')
+    else:
+        raise ValueError('allowed values for plot: \'residuals\', \'errors\' ')
 
-    plt.legend(['CG', 'BFGS'])
+    plt.legend(['CG', 'GD', 'BFGS'])
     plt.show()
 
 def bfgs_visual(n=100):

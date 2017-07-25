@@ -69,7 +69,7 @@ def wolfe(a, c1, c2, A, b, x, x_new, p, gr, gr_new):
 
     return lhs <= rhs
 
-def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
+def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
     """
     Page 140/Algorithm 6.1 in Nocedal and Wright.
     Also see the Implementation section on pages 142-143.
@@ -93,28 +93,37 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
     k = 0
     x = np.zeros(n)
     exes = [x]
+    if x_true is not None:
+        x_difs = [la.norm(x_true - x)]
 
     start_time = time.time()
 
     gr = A.dot(x) - b           # gradient
-    # gr_norm = la.norm(gr)
-    residuals = [(la.norm(gr), time.time() - start_time)] # residual = -gradient
+    gr_norm = la.norm(gr)
+    residuals = [(gr_norm, time.time() - start_time)] # residual = -gradient
     # OPTIMIZED
     p = np.array(-H.dot(gr)).reshape(n, )
 
-    while la.norm(gr) > tol:
+    while gr_norm > tol:
         # NON-OPTIMIZED
         # p = np.array(-H.dot(gr)).reshape(n, )   # search direction (6.18)
 
         # ===================================================
         # TODO: Best way to det. step size
         # TODO: DAMPED BFGS (for when curvature doesn't change much)
-        #a = btls(A=A,b=b,x=x,p=np.copy(p.reshape(n,)),g=gr)
-        a = 1.0
+        Ap = A.dot(p)
+        a = (np.inner(b, p) - np.inner(x, Ap)) / (np.inner(p, Ap))
+        print('step size at %d: %f' % (k, a))
+
+        # ===================================================
+        # Then update x, calculate new gradient
         x_new = x + a*p
         gr_new = A.dot(x_new) - b
+        gr_norm = la.norm(gr_new)
 
-        residuals.append((la.norm(gr_new), time.time() - start_time))
+        residuals.append((gr_norm, time.time() - start_time))
+        if x_true is not None:
+            x_difs.append(la.norm(x_true - x_new))
 
         # ===================================================
         # Calculate x-step, gradient-change
@@ -131,6 +140,7 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
 
         # OPTIMIZED
         Hy = H.dot(y)
+        #print(Hy.shape, type(Hy))
         Hy = np.array(Hy).reshape(n,)
         yHy = y.dot(Hy)
         HysT = np.outer(Hy,s)
@@ -155,7 +165,10 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500):
         if k >= max_iter:
             break
 
-    return x, k, residuals, exes
+    if x_true is None:
+        return x, k, residuals, exes
+    else:
+        return x, k, residuals, exes, x_difs
 
 class BFGSSolver(optimize.Solver):
     """

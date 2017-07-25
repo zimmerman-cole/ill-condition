@@ -572,7 +572,7 @@ class ConjugateGradientsSolver(Solver):
         if 'restart_mtd' not in kwargs:
             restart_mtd = "gd"
         else:
-            restart_mtd = int(kwargs['restart_mtd'])
+            restart_mtd = str(kwargs['restart_mtd'])
 
 
         start_time = time.time()
