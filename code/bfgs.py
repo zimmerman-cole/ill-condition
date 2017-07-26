@@ -408,6 +408,27 @@ def l_bfgs_switch(A, b, m=10, tol=10**-5, max_iter=500, x_true=None, switch_tol=
 
         return r
 
+    def calc_Hk(H_k_m=None, k=k, m=m, n=n, beta=1.0, ys=ys, ss=ss, rhos=rhos):
+        """
+        Computes / returns H_k from last m updates to initial H_{k-m} explicitly
+        for use in passing to BFGS after switch
+        """
+        if H_k_m is None:
+            iden = sps.eye
+            H_k_m = beta*iden(n)
+            H_j_1 = H_k_m
+        for j in range(k-m, k):
+            # OPTIMIZED
+            Hy = H_j_1.dot(ys[j])
+            Hy = np.array(Hy).reshape(n,)
+            yHy = ys[j].dot(Hy)
+            HysT = np.outer(Hy,ss[j])
+            rssT = rhos[j]*np.outer(ss[j],ss[j])
+            H_j = H_j_1 - rhos[j]*HysT - rhos[j]*HysT.T + rhos[j]*yHy*rssT + rssT
+            H_j_1 = H_j
+        H_k = H_j_1
+        return H_k
+
 
     while k < max_iter:
         ## tolerance threshold
@@ -418,8 +439,12 @@ def l_bfgs_switch(A, b, m=10, tol=10**-5, max_iter=500, x_true=None, switch_tol=
             if abs(residuals[k-1][0] - residuals[k-switch_lb-1][0]) < switch_tol:
                 print("switched after %s iters" % k)
                 ## switch to BFGS
-                # print(p)
-                x, k2, residuals_bfgs, exes = bfgs(A, b, p0=p, x=x, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None)
+                t1 = time.time()
+                H_k = calc_Hk()
+                t2 = time.time()
+                t = t2-t1
+                print("computed H_k in %s sec" % t)
+                x, k2, residuals_bfgs, exes = bfgs(A, b, p0=p, x=x, H=H_k, B=1.0, tol=10**-5, max_iter=max_iter-k, x_true=None)
                 k = k+k2
                 tt = residuals[-1][1]
                 print(tt)
@@ -455,7 +480,7 @@ def l_bfgs_switch(A, b, m=10, tol=10**-5, max_iter=500, x_true=None, switch_tol=
 
     return x, k, residuals
 
-def l_bfgs_resids(n=100, plot_bfgs=True, max_iter=1000,sp=1):
+def l_bfgs_resids(n=100, plot_bfgs=False, max_iter=1000,sp=1):
     """
     L-BFGS residuals plotted (vs. BFGS and CG residuals)
     """
@@ -469,12 +494,12 @@ def l_bfgs_resids(n=100, plot_bfgs=True, max_iter=1000,sp=1):
     x_true = np.array([100 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
     b = A.dot(x_true)
 
+    m = 5
+    xopt, n_iter, lb_resids = l_bfgs(A=A, b=b,max_iter=max_iter, m=m)
+    print('L-BFGS(%s) took %d iter' % (m,n_iter))
 
-    xopt, n_iter, lb_resids = l_bfgs(A=A, b=b,max_iter=2*max_iter)
-    print('L-BFGS took %d iter' % n_iter)
-
-    xopt, n_iter, switch_resids = l_bfgs_switch(A=A, b=b, switch_tol=10**-2, switch_lb=50,max_iter=max_iter)
-    print('L-BFGS-Switch took %d iter' % n_iter)
+    xopt, n_iter, switch_resids = l_bfgs_switch(A=A, b=b, switch_tol=10**-2, switch_lb=50,max_iter=max_iter, m=m)
+    print('L-BFGS(%s)-Switch took %d iter' % (m,n_iter))
 
     if plot_bfgs:
         xopt, n_iter, b_resids, b_path = bfgs(A=A, b=b, B=2.0)
@@ -585,4 +610,4 @@ class BFGSSolver(optimize.Solver):
 
 
 if __name__ == "__main__":
-    l_bfgs_resids(n=1000)
+    l_bfgs_resids(n=2000)
