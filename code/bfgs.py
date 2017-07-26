@@ -455,7 +455,7 @@ def l_bfgs_switch(A, b, m=10, tol=10**-5, max_iter=500, x_true=None, switch_tol=
 
     return x, k, residuals
 
-def l_bfgs_resids(n=100, plot_bfgs=True, max_iter=1000):
+def l_bfgs_resids(n=100, plot_bfgs=True, max_iter=1000,sp=1):
     """
     L-BFGS residuals plotted (vs. BFGS and CG residuals)
     """
