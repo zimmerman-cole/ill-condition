@@ -71,7 +71,7 @@ def wolfe(a, c1, c2, A, b, x, x_new, p, gr, gr_new):
 
     return lhs <= rhs
 
-def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
+def bfgs(A, b, x=None, p0=None, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
     """
     Page 140/Algorithm 6.1 in Nocedal and Wright.
     Also see the Implementation section on pages 142-143.
@@ -94,7 +94,10 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
     # =======================================================
 
     k = 0
-    x = np.zeros(n)
+    if x is None:
+        x = np.zeros(n)
+    else:
+        x = x
     exes = [x]
     if x_true is not None:
         x_difs = [la.norm(x_true - x)]
@@ -104,8 +107,12 @@ def bfgs(A, b, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None):
     gr = A.dot(x) - b           # gradient
     gr_norm = la.norm(gr)
     residuals = [(gr_norm, time.time() - start_time)]   # residual = -gradient
+
     # OPTIMIZED
-    p = np.array(-H.dot(gr)).reshape(n, )   # (6.18) search direction
+    if p0 is None:
+        p = np.array(-H.dot(gr)).reshape(n, )   # (6.18) search direction
+    else:
+        p = p0
 
     while gr_norm > tol:
 
@@ -320,7 +327,135 @@ def l_bfgs(A, b, m=10, tol=10**-5, max_iter=500, x_true=None):
 
     return x, k, residuals
 
-def l_bfgs_resids(n=100, plot_bfgs=False, sp=1):
+def l_bfgs_switch(A, b, m=10, tol=10**-5, max_iter=500, x_true=None, switch_tol=10**-2, switch_lb=10):
+    """
+    Limited-memory BFGS (Nocedal and Wright pg. 177).
+        Based off algorithms 7.5 (& 7.4) from N and W.
+
+    Instead of explicitly tracking H, this algorithm tracks the last m
+        set of vectors {si, yi} (tracking curvature information from last
+        m iterations). At each iteration, discard oldest vector pair and
+        replace it with new pair.
+
+    The product (Hk * grad) can be computed efficiently using these
+        vector pairs.
+    """
+    n = A.shape[0]
+    x = np.zeros(n,)
+
+    # Initialize m vector-pairs (all as zeros)
+    ys = [np.zeros(n) for _ in range(m)]    # last m y-vectors
+    ss = [np.zeros(n) for _ in range(m)]    # last m s-vectors
+    rhos = [0 for _ in range(m)]            # corresponding rhos
+
+    start_time = time.time()
+    k = 0
+
+    gr = A.dot(x) - b   # initial gradient
+    gr_norm = la.norm(gr)
+
+    residuals = [(gr_norm, time.time() - start_time)]
+
+    # setup iteration (done outside main loop) =================================
+    # (does a step of gradient descent then saves relevant data)
+    p = -gr
+
+    # calculate step size ======
+    Ap = A.dot(p)
+    a = (np.inner(b, p) - np.inner(x, Ap)) / (np.inner(p, Ap))
+    #print('step size at setup: %f' % a)
+
+    # update x =================
+    x_new = x + a*p
+    gr_new = A.dot(x_new) - b
+    gr_norm = la.norm(gr_new)
+    residuals.append((gr_norm, time.time() - start_time))
+
+    ys[0] = gr_new - gr
+    ss[0] = x_new - x
+    rhos[0] = 1.0 / np.inner(ys[0], ss[0])
+
+    ix = 1      # index of next (oldest) vector-pair to be replaced
+
+    k += 1
+    x, gr = x_new, gr_new
+    # ==========================================================================
+
+    def Hgrad(q, ys, ss, rhos):
+        """
+        Computes the product (Hk * gradient) at each iteration.
+            Based off algorithm 7.4 from Nocedal & Wright.
+
+          gr:     gradient of obj. function at current x
+          ys:     last m y-vectors
+          ss:     last m s-vectors
+        rhos:     vector-pairs' corresponding rhos
+        """
+        # Calculate Hk0 using (7.20)
+        gamma = np.inner(  ss[(k-1)%m],   ys[(k-1)%m]  )   /   (la.norm(ss[(k-1)%m])**2)
+        H = (gamma * sps.eye(n)).tocsr()
+
+        alphas = [0 for _ in range(m)]
+        for i in range(min(k, m)):
+            alphas[i] = rhos[i] * np.inner(ss[i], q)
+            q -= alphas[i] * ys[i]
+
+        r = H.dot(q)
+
+        for i in range(min(k, m)):
+            B = rhos[i] * np.inner(ys[i], r)
+            r += ss[i] * (alphas[i]-B)
+
+        return r
+
+
+    while k < max_iter:
+        ## tolerance threshold
+        if gr_norm < tol:
+            break
+        ## residual progress threshold for switch
+        if k%switch_lb == 0:
+            if abs(residuals[k-1][0] - residuals[k-switch_lb-1][0]) < switch_tol:
+                print("switched after %s iters" % k)
+                ## switch to BFGS
+                # print(p)
+                x, k2, residuals_bfgs, exes = bfgs(A, b, p0=p, x=x, H=None, B=1.0, tol=10**-5, max_iter=500, x_true=None)
+                k = k+k2
+                tt = residuals[-1][1]
+                print(tt)
+                residuals_bfgs = [(r[0], r[1]+tt) for r in residuals_bfgs]
+                # residuals_bfgs[-1][1] = time.time() - start_time
+                residuals = residuals + residuals_bfgs
+                break
+
+        # Chooses Hk0, then computes the product (Hk * gr) =====
+        p = -Hgrad(gr, ys, ss, rhos)
+
+        # Calculate step size ==================================
+        Ap = A.dot(p)
+        a = (np.inner(b, p) - np.inner(x, Ap)) / (np.inner(p, Ap))
+        #print('step size at %d: %f' % (k, a))
+
+        # Update x =============================================
+        x_new = x + a*p
+        gr_new = A.dot(x_new) - b
+        gr_norm = la.norm(gr_new)
+        residuals.append((gr_norm, time.time() - start_time))
+
+        # Replace oldest vector-pair with new information ======
+        ys[ix] = gr_new - gr
+        ss[ix] = x_new - x
+        rhos[ix] = 1.0 / np.inner(ys[ix], ss[ix])   # (7.17)
+
+        # increment index of next vector-pair to be replaced ===
+        ix = (ix+1) % m
+
+        k += 1
+        x, gr = x_new, gr_new
+
+    return x, k, residuals
+
+def l_bfgs_resids(n=100, plot_bfgs=True, max_iter=1000):
     """
     L-BFGS residuals plotted (vs. BFGS and CG residuals)
     """
@@ -335,23 +470,27 @@ def l_bfgs_resids(n=100, plot_bfgs=False, sp=1):
     b = A.dot(x_true)
 
 
-    xopt, n_iter, lb_resids = l_bfgs(A=A, b=b)
+    xopt, n_iter, lb_resids = l_bfgs(A=A, b=b,max_iter=2*max_iter)
     print('L-BFGS took %d iter' % n_iter)
+
+    xopt, n_iter, switch_resids = l_bfgs_switch(A=A, b=b, switch_tol=10**-2, switch_lb=50,max_iter=max_iter)
+    print('L-BFGS-Switch took %d iter' % n_iter)
 
     if plot_bfgs:
         xopt, n_iter, b_resids, b_path = bfgs(A=A, b=b, B=2.0)
         print('BFGS took %d iter' % n_iter)
 
     cgs = optimize.ConjugateGradientsSolver(A=A, b=b, full_output=1)
-    xopt, n_iter, cg_resids = cgs.solve()
+    xopt, n_iter, cg_resids = cgs.solve(max_iter=max_iter)
     print('CG took %d iter' % n_iter)
 
     gds = optimize.GradientDescentSolver(A=A, b=b, full_output=1)
-    xopt, n_iter, gd_resids = gds.solve()
+    xopt, n_iter, gd_resids = gds.solve(max_iter=max_iter)
     print('GD took %d iter' % n_iter)
 
-    leg = ['L-BFGS', 'CG', 'GD']
+    leg = ['L-BFGS', 'L-BFGS-Switch','CG', 'GD']
     plt.plot([t for n,t in lb_resids], [n for n,t in lb_resids], marker='o')
+    plt.plot([t for n,t in switch_resids], [n for n,t in switch_resids], marker='o', markersize=3)
     plt.plot([t for n,t in cg_resids], [n for n,t in cg_resids], marker='o')
     plt.plot([t for n,t in gd_resids], [n for n,t in gd_resids], marker='o')
     if plot_bfgs:
@@ -446,4 +585,4 @@ class BFGSSolver(optimize.Solver):
 
 
 if __name__ == "__main__":
-    bfgs_system()
+    l_bfgs_resids(n=1000)
