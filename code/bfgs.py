@@ -5,7 +5,7 @@ import scipy.sparse as sps
 import scipy.sparse.linalg as spsla
 import matplotlib.pyplot as plt
 import optimize, time
-import sys
+import sys, util
 from tomo2D import drt as drt
 
 
@@ -320,13 +320,17 @@ def l_bfgs(A, b, m=10, tol=10**-5, max_iter=500, x_true=None):
 
     return x, k, residuals
 
-def l_bfgs_resids(n=100, plot_bfgs=False):
+def l_bfgs_resids(n=100, plot_bfgs=False, sp=1):
     """
     L-BFGS residuals plotted (vs. BFGS and CG residuals)
     """
 
-    A = sps.random(n, n)
-    A = A.T.dot(A)
+    if sp:
+        A = sps.random(n, n)
+        A = A.T.dot(A)
+    else:
+        A = util.psd_from_cond(cond_num=10**8, n=1000)
+
     x_true = np.array([100 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
     b = A.dot(x_true)
 
@@ -358,6 +362,39 @@ def l_bfgs_resids(n=100, plot_bfgs=False):
     plt.xlabel('Time')
     plt.legend(leg)
     plt.yscale('log')
+    plt.show()
+
+def l_bfgs_system(n=1000, m=100):
+    """
+    Test L-BFGS on "realistic" system matrix.
+
+    (int)   n: image is (n x n) pixels.
+    (int)   m: number of rays to fire.
+    """
+    X = drt.gen_X(n_1=n, n_2=n, m=m, sp_rep=1)
+    X = X.T.dot(X)
+
+    f_true = np.array([100 if (0.4*(n**2))<=i and i<(0.6*(n**2)) else 0 for i in range(n**2)])
+    g = X.dot(f_true)
+
+    xopt, n_iter, lb_resids = l_bfgs(A=X, b=g)
+    print('L-BFGS took %d iter' % n_iter)
+
+    cgs = optimize.ConjugateGradientsSolver(A=X, b=g, full_output=1)
+    xopt, n_iter, cg_resids = cgs.solve()
+    print('CG took %d iter' % n_iter)
+
+    gds = optimize.GradientDescentSolver(A=X, b=g, full_output=1)
+    xopt, n_iter, gd_resids = gds.solve()
+    print('GD took %d iter' % n_iter)
+
+    plt.plot([t for n,t in lb_resids], [n for n,t in lb_resids], marker='o')
+    plt.plot([t for n,t in cg_resids], [n for n,t in cg_resids], marker='o')
+    plt.plot([t for n,t in gd_resids], [n for n,t in gd_resids], marker='o')
+    plt.legend(['L-BFGS', 'CG', 'GD'])
+    plt.yscale('log')
+    plt.ylabel('Residual Norm')
+    plt.xlabel('Time (sec)')
     plt.show()
 
 class BFGSSolver(optimize.Solver):
