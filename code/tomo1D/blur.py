@@ -19,7 +19,7 @@ plt.show()
 
 def template_1d(sigma=None, t=0):
     """
-    Template for Gaussian Blur of 1D image
+    Computes discretized template for 1D Gaussian Blur
     Args
         - f     :  image
         - sigma :  standard deviation
@@ -31,10 +31,10 @@ def template_1d(sigma=None, t=0):
     """
 
     ## construct RV for integration
-    x = norm.(0,sigma)
+    x = norm(0,sigma)
 
     ## construct sliding pixel template
-    template_inds = arange(-t,t+1)
+    template_inds = range(-t,t+1)
     template = [(t-0.5, t+0.5) for t in template]
 
     ## integrate over midpoints to get weights
@@ -45,6 +45,22 @@ def template_1d(sigma=None, t=0):
     template = [t/sumt for t in template]
 
     ## return
-    return template
+    return template, template_inds
 
-def row1(template, n)
+def row_k(k=0, template=None, template_inds=None, n=None):
+    """
+    Returns a row of 1D Gaussian Blur
+    """
+
+    ## compute window size from template
+    t = int(np.floor(len(template)/2))
+
+    ## initialize row with all zeros
+    r_k = np.zeros(n)
+
+    ## fill in template
+    inds = [(t+k)%n for t in template_inds]
+    r_k[inds] = template
+
+    ## return
+    return r_k
