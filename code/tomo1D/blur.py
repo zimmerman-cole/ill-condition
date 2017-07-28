@@ -93,7 +93,7 @@ def row_k(k=0, template=None, template_inds=None, n=None, sparse=True, debug=Fal
     ## return
     return r_k
 
-def fwdblur_oeprator_1d(n=None, sigma=3, t=3, sparse=True, plot=False, debug=False):
+def fwdblur_oeprator_1d(n=None, sigma=3, t=10, sparse=True, plot=False, debug=False):
     """
     Returns an n x n np.array
     Args
@@ -159,6 +159,16 @@ def test_symm(X, d=8):
     else:
         return False
 
-X = fwdblur_oeprator_1d(n=11, plot=False, debug=False)
-print('===========')
-print(test_symm(X))
+if __name__ == "__main__":
+    X = fwdblur_oeprator_1d(n=11, sigma=3, t=3, plot=True, debug=True)
+    print('===========')
+    print(test_symm(X))
+
+    X = fwdblur_oeprator_1d(n=11, sigma=3, t=10, plot=True, debug=True)
+    print('===========')
+    print(test_symm(X))
+
+    X = fwdblur_oeprator_1d(n=100, sigma=3, t=10, plot=True, debug=True)
+    print(type(X))
+    print('===========')
+    print(test_symm(X))
