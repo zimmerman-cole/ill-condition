@@ -159,6 +159,6 @@ def test_symm(X, d=8):
     else:
         return False
 
-X = fwdblur_oeprator_1d(n=11, plot=False, debug=True)
+X = fwdblur_oeprator_1d(n=11, plot=False, debug=False)
 print('===========')
 print(test_symm(X))
