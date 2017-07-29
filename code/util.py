@@ -303,12 +303,10 @@ def gen_M_1d(k=None, n=None, sparse=True):
         data = np.ones(n)
         offsets = s1
         M = sps.dia_matrix((data,offsets), shape=(k,n))
-        print(M.toarray())
     else:
         d = np.concatenate([np.zeros(s1), np.ones(k), np.zeros(s2)])
         M = np.diag(d)
         M = M[s1:(s1+k),:]
-        print(M)
     return M
 
 def gen_instance_1d(m=None, n=None, k=None, sigma=3, t=10, sparse=True):
