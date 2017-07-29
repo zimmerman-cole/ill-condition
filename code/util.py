@@ -1,7 +1,9 @@
 import numpy as np
 import numpy.linalg as la
+import scipy.sparse as sps
 import matplotlib.pyplot as plt
 import optimize, visual, traceback, sys
+from tomo1D import blur as blur  # not working
 
 # not positive-definite
 def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
@@ -256,3 +258,78 @@ def gen_data(n=100, cond_num=100):
     b = np.dot(A, x_true)
 
     return A, b, x_true
+
+## ========== Hotelling Observer Problem ==========
+def gen_Kb(m=None, sparse=True):
+    """
+    m: dimension of data space
+    """
+    if m is None:
+        print("specify `m` in gen_Kb")
+        sys.exit(0)
+
+    d = abs(np.random.randn(m))
+    if sparse:
+        return sps.diags(diagonals=d)
+    else:
+        K = np.zeros([m,m])
+        for i in range(m):
+            K[i][i] = d[i]
+        return K
+
+def gen_M_1d(k=None, n=None, sparse=True):
+    """
+    centers the k-dim ROI in an n-vector
+    Args
+        k: dimension of ROI
+        n: dimension of image space (number of 1d pixels)
+    Returns
+        M: a k x n matrix
+    """
+    if n is None:
+        print("specify `n` in gen_M_1d")
+        sys.exit(0)
+
+    if k is None:
+        print("specify `k` in gen_M_1d")
+        sys.exit(0)
+
+    ## find split1 and split 2 indices
+    s1 = (n-k)/2
+    s2 = n-(s1+k)
+
+    ## build diagonal
+    if sparse:
+        data = np.ones(n)
+        offsets = s1
+        M = sps.dia_matrix((data,offsets), shape=(k,n))
+        print(M.toarray())
+    else:
+        d = np.concatenate([np.zeros(s1), np.ones(k), np.zeros(s2)])
+        M = np.diag(d)
+        M = M[s1:(s1+k),:]
+        print(M)
+    return M
+
+def gen_instance_1d(m=None, n=None, k=None, sigma=3, t=10, sparse=True):
+    """
+    Args
+        m: dimension of data space
+        k: dimension of ROI
+        n: dimension of image space (number of 1d pixels)
+        sigma: gaussian blur standard deviation
+        t: gaussian blur pixel window size
+    Returns
+        M: a k x n matrix
+    """
+    Kb = gen_Kb(m=m, sparse=sparse)
+    X = blur.fwdblur_oeprator_1d(n=n, sigma=sigma, t=t, sparse=sparse)
+    M = gen_M_1d(k=k, n=n, sparse=sparse)
+
+    return Kb, X, M
+
+if __name__ == "__main__":
+    Kb, X, M = gen_instance_1d(m=25, n=100, k=100, sigma=3, t=10, sparse=True)
+    print(Kb)
+    print(X)
+    print(M)
