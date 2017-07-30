@@ -260,7 +260,7 @@ def gen_data(n=100, cond_num=100):
     return A, b, x_true
 
 ## ========== Hotelling Observer Problem ==========
-def gen_Kb(m=None, sparse=True):
+def gen_Kb(m=None, K_diag=None, sparse=True):
     """
     m: dimension of data space
     """
@@ -268,7 +268,11 @@ def gen_Kb(m=None, sparse=True):
         print("specify `m` in gen_Kb")
         sys.exit(0)
 
-    d = abs(np.random.randn(m))
+    if K_diag is None:
+        d = abs(np.random.randn(m))
+    else:
+        d = K_diag
+
     if sparse:
         return sps.diags(diagonals=d)
     else:
@@ -309,7 +313,7 @@ def gen_M_1d(k=None, n=None, sparse=True):
         M = M[s1:(s1+k),:]
     return M
 
-def gen_instance_1d(m=None, n=None, k=None, sigma=3, t=10, sparse=True):
+def gen_instance_1d(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=True):
     """
     Args
         m: dimension of data space
@@ -320,14 +324,8 @@ def gen_instance_1d(m=None, n=None, k=None, sigma=3, t=10, sparse=True):
     Returns
         M: a k x n matrix
     """
-    Kb = gen_Kb(m=m, sparse=sparse)
+    Kb = gen_Kb(m=m, K_diag=K_diag, sparse=sparse)
     X = blur.fwdblur_oeprator_1d(n=n, sigma=sigma, t=t, sparse=sparse)
     M = gen_M_1d(k=k, n=n, sparse=sparse)
 
     return Kb, X, M
-
-if __name__ == "__main__":
-    Kb, X, M = gen_instance_1d(m=25, n=100, k=100, sigma=3, t=10, sparse=True)
-    print(Kb)
-    print(X)
-    print(M)
