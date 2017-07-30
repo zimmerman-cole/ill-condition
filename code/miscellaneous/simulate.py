@@ -1,9 +1,11 @@
 import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
-import util, optimize, test_solvers
 import time, datetime
-import os
+import os, sys
+
+sys.path.append('..')
+import util, optimize, test_solvers
 
 
 ## =============================================================================
