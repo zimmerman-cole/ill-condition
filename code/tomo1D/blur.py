@@ -1,4 +1,6 @@
 import numpy as np
+import numpy.linalg as la
+import scipy.linalg as spla
 import scipy.sparse as sps
 from pprint import pprint
 from scipy.stats import norm
@@ -83,9 +85,11 @@ def row_k(k=0, template=None, template_inds=None, n=None, sparse=True, debug=Fal
 
     ## debug
     if debug:
-        rr_k = r_k.toarray()
-        # rr_k = [round(r,3) for r in rr_k]
-        rr_k = np.round_(rr_k,3)
+        if sparse:
+            rr_k = r_k.toarray()
+        else:
+            rr_k = r_k
+        rr_k_round = np.round_(rr_k,3)
         print(rr_k,)
         print("type r_k",type(rr_k))
         print("")
@@ -140,10 +144,18 @@ def fwdblur_oeprator_1d(n=None, sigma=3, t=10, sparse=True, plot=False, debug=Fa
             X = np.vstack([X, r_k])
 
     if debug:
-        XX = X.toarray()
-        XX = np.round_(XX,3)
+        if sparse:
+            XX = X.toarray()
+        else:
+            XX = X
+        XX_round = np.round_(XX,3)
         print(XX.shape)
-        pprint(XX)
+        pprint(XX_round)
+
+        r0 = row_k(k=0, template=template, template_inds=template_inds, n=n, sparse=False, debug=False)
+        XXX = spla.circulant(r0)
+        print(np.round_(XXX-XX,3))
+        print(np.sum(np.round_(XXX-XX,3)))
     ## return
     return X
 
@@ -151,10 +163,24 @@ def test_symm(X, d=8):
     """
     Test symmetry to `d` digits of precision
     """
-    X = X.toarray()
+    if sps.issparse(X):
+        X = X.toarray()
     T = X.T - X
     T = np.round_(T,d)
     if abs(sum(sum(T))) < 10**-d:
+        return True
+    else:
+        return False
+
+def test_dft(X, d=8):
+    """
+    Tests whether DFT diagonalizes X to `d` digits of precision
+    """
+    F = np.asmatrix(np.fft.fft(X))
+    Finv = la.inv(F)
+    T = Finv.dot(X).dot(F)
+    T = np.round_(T,d)
+    if T.trace() - np.sum(T) < 10**-d:
         return True
     else:
         return False
