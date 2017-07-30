@@ -2,9 +2,12 @@ import numpy as np
 import numpy.linalg as la
 import matplotlib, colorsys
 import matplotlib.pyplot as plt
-import util, optimize, sys, pprint
+import util, sys, pprint
 import scipy.linalg as sla
 from mpl_toolkits.mplot3d import Axes3D
+
+sys.path.append('..')
+import optimize
 
 def norm_dif(x, *args):
     """

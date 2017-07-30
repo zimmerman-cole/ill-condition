@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import scipy as sp
-import random 
+import random
 from util import mat_from_cond
 from scipy.optimize import minimize
 
@@ -13,7 +13,7 @@ from scipy.optimize import minimize
 ## generating ill-conditioned matrix A
 m = 50
 n = 50
-A = mat_from_cond(1,m,n)  # args = cond_num, m=50, n=50, min_sing=None
+A = np.random.randn(m, n)  # args = cond_num, m=50, n=50, min_sing=None
 print(A)
 print(la.cond(A))
 
