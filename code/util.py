@@ -4,7 +4,8 @@ import scipy.sparse as sps
 import matplotlib.pyplot as plt
 import optimize, traceback, sys
 from miscellaneous import visual
-from tomo1D import blur as blur  # not working
+from tomo1D import blur as blur
+from cvxopt import spmatrix
 
 # not positive-definite
 def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
@@ -330,3 +331,11 @@ def gen_instance_1d(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=T
     M = gen_M_1d(k=k, n=n, sparse=sparse)
 
     return Kb, X, M
+
+def scipy_sparse_to_spmatrix(A):
+    """
+    Takes scipy sparse matrix to a cvxopt spmatrix
+    """
+    coo = A.tocoo()
+    SP = spmatrix(coo.data.tolist(), coo.row.tolist(), coo.col.tolist(), size=A.shape)
+    return SP
