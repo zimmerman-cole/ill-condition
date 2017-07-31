@@ -2,6 +2,8 @@ import numpy as np
 import numpy.linalg as la
 import scipy.sparse as sps
 import util, optimize
+import tomo2D.drt as drt
+import matplotlib.pyplot as plt
 
 """
 Projection-based methods
@@ -10,7 +12,7 @@ Projection-based methods
     -...
 """
 
-def pocs(Kb, A, sb, lam, M, B=None, full_output=0):
+def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     """
     Projection onto Convex Sets.
 
@@ -32,9 +34,11 @@ def pocs(Kb, A, sb, lam, M, B=None, full_output=0):
            M:     Mask matrix.
            B:     Regularization matrix (i.e. identity or
                         finite differencing).
+    max_iter:     Max number of iterations.
+         tol:     Desired accuracy for minimization problem
+                    (linear constraint must be completely accurate).
 
-      full_output: for plotting intermediate info...
-                    TODO
+        full_output: TODO - for plotting intermediate info...
 
     Returns:
         Optimal u.
@@ -55,8 +59,6 @@ def pocs(Kb, A, sb, lam, M, B=None, full_output=0):
     min_solver = optimize.ConjugateGradientsSolver(
         A = A.T.dot(Kb.dot(A)), b = A.T.dot(sb), full_output=0
     )
-    print('min mat: ' + str(min_solver.A.shape))
-    print('  min b: ' + str(min_solver.b.shape))
 
     # Set up solver for constraint term
     constr_solver = optimize.ConjugateGradientsSolver(
@@ -64,48 +66,96 @@ def pocs(Kb, A, sb, lam, M, B=None, full_output=0):
         b = np.zeros(n), full_output = 0
     )
 
+    min_errors = []
+    constr_errors = []
+
     u = np.zeros(n)
 
-    for i in range(100):
+    for i in range(max_iter):
         print('=== Iter %d =============' % i)
+
+        # === Solve minimization problem ================================
         u = min_solver.solve(x_0=u)
-        print('min err: %.2f' % la.norm(min_solver.A.dot(u) - min_solver.b))
-        print('constr err: %.2f\n' % la.norm(constr_solver.A.dot(u) - constr_solver.b))
+        min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
+        constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
 
+        print('min err: %.2f' % min_err)
+        print('constr err: %.2f\n' % constr_err)
+
+        min_errors.append(min_err)
+        constr_errors.append(constr_err)
+
+        # === Solve constraint problem ==================================
         u = constr_solver.solve(x_0=u)
+        min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
+        constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
 
-        print('min err: %.2f' % la.norm(min_solver.A.dot(u) - min_solver.b))
-        print('constr err: %.2f' % la.norm(constr_solver.A.dot(u) - constr_solver.b))
+        print('min err: %.2f' % min_err)
+        print('constr err: %.2f' % constr_err)
 
-        raw_input()
+        min_errors.append(min_err)
+        constr_errors.append(constr_err)
+
+        #raw_input()
+
+    plt.plot(min_errors, marker='o')
+    plt.plot(constr_errors, marker='o')
+    plt.legend(['Minimization', 'Constraint'])
+    plt.xlabel('Iteration')
+    plt.ylabel('Absolute Error for each System')
+    plt.show()
+
+    return u
 
 if __name__ == "__main__":
-    # problem parameters
-    m = 100     # number of pixels in image space
-    n = m       # number of pixels in data space
-    k = 100     # number of pixels in ROI
-    lam = 1.0   # lambda (reg. strength)
+    # BLURRING PROBLEM
+    if 1:
+        # problem parameters
+        m = 100     # number of pixels in image space
+        n = m       # number of pixels in data space
+        k = 10     # number of pixels in reconstruction ROI
+        lam = 1.0   # lambda (reg. strength)
 
-    # blur parameters
-    sigma = 3
-    t = 10
+        # blur parameters
+        sigma = 3
+        t = 10
 
-    # load 1d image
-    filename = 'tomo1D/f_impulse_100.npy'
-    sx = np.load(filename)
+        # load 1d image
+        filename = 'tomo1D/f_impulse_100.npy'
+        sx = np.load(filename)
 
-    print('Generating problem instance w/ params:')
-    print('m: %d    k: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
-    Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
-                K_diag=np.ones(m, dtype=np.float64), sigma=3, t=1, \
-                sparse=True)
+        print('Generating problem instance w/ params:')
+        print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
+        Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
+                    K_diag=np.ones(m, dtype=np.float64), sigma=3, t=1, \
+                    sparse=True)
 
-    sb = X.dot(sx)
+        sb = X.dot(sx)
 
-    print('Kb shape: ' + str(Kb.shape))
-    print(' X shape: ' + str(X.shape))
-    print(' M shape: ' + str(M.shape))
-    print('sx shape: ' + str(sx.shape))
-    print('sb shape: ' + str(sb.shape))
+        print('Kb shape: ' + str(Kb.shape))
+        print(' X shape: ' + str(X.shape))
+        print(' M shape: ' + str(M.shape))
+        print('sx shape: ' + str(sx.shape))
+        print('sb shape: ' + str(sb.shape))
 
-    uopt = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
+        uopt = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    pass
