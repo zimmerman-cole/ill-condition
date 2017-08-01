@@ -28,6 +28,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     Uses Conjugate Gradient method to solve the systems at each
         iteration.
 
+    ============================================================================
     Args:
           Kb:     Covariance matrix (in data space).
            A:     Forward projector/blurrer.
@@ -118,7 +119,37 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
 
     return u
 
+def raar(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
+    """
+    Relaxed Averaged Alternating Reflections.
+
+    Solves the system:
+                 min_u || Kb^.5 A u - Kb^-.5 sb || ^2
+
+        s.t.    (I - M.T M)(A.T A + lam B.T B) u = 0
+    ============================================================================
+    Args:
+          Kb:     Covariance matrix (in data space).
+           A:     Forward projector/blurrer.
+          sb:     Signal in data space.
+         lam:     Regularization strength.
+           M:     Mask matrix.
+           B:     Regularization matrix (i.e. identity or
+                        finite differencing).
+    max_iter:     Max number of iterations.
+         tol:     Desired accuracy for minimization problem
+                    (linear constraint must be completely accurate).
+
+        full_output: TODO - for plotting intermediate info...
+
+    Returns:
+        Optimal u.
+    """
+    pass
+
 if __name__ == "__main__":
+    # CHOOSE PROBLEM ===========================================================
+
     # BLURRING PROBLEM
     if 0:
         # problem parameters
@@ -135,7 +166,7 @@ if __name__ == "__main__":
         filename = 'tomo1D/f_impulse_100.npy'
         sx = np.load(filename)
 
-        print('Generating blur problem instance w/ params:')
+        print('Generating blur problem w/ params:')
         print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
         Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
                     K_diag=np.ones(m, dtype=np.float64), sigma=3, t=1, \
@@ -149,16 +180,19 @@ if __name__ == "__main__":
         print('sx shape: ' + str(sx.shape))
         print('sb shape: ' + str(sb.shape))
 
-        uopt = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
+    # SMALL TOMO PROBLEM (10 x 10 square)
+    if 0:
 
-    # TOMO PROBLEM
-    if 1:
+        # p and n are switched here compared to Sean's notes
 
         m = 10              # number of x-rays
         n_1, n_2 = 10, 10   # image dimensions
-        n = n_1*n_2
+        n = n_1*n_2         # number of pixels (ROIrecon=full image)
         p = 10              # number of pixels in HO ROI
         lam = 1.0           # regularization strength
+
+        print('Generating tomo problem w/ params: ')
+        print('m: %d    n: %d   lam: %d     p: %d' % (m, n, lam, p))
 
         # generate image (square)
         f = np.zeros((n_1, n_2))
@@ -167,12 +201,10 @@ if __name__ == "__main__":
                 f[i, j] = 1
         f = f.reshape(n,)
 
-        print('Generating tomo problem w/ params: ')
-        print('m: %d    n: %d   lam: %d     p: %d' % (m, n, lam, p))
 
-        # generate forward projector X, sinogram g
+        # generate forward projector X, sinogram g (sb)
         X = drt.gen_X(n_1=n_1, n_2=n_2, m=m, sp_rep=True)
-        g = X.dot(f)
+        sb = X.dot(f)
 
         # generate covariance matrix (data space) and mask
         Kb = sps.eye(m)
@@ -184,11 +216,49 @@ if __name__ == "__main__":
 
         print(' X shape: ' + str(X.shape))
         print(' f shape: ' + str(f.shape))
-        print(' g shape: ' + str(g.shape))
+        print('sb shape: ' + str(sb.shape))
         print('Kb shape: ' + str(Kb.shape))
         print(' M shape: ' + str(M.shape))
 
-        uopt = pocs(Kb=Kb, A=X, sb=g, lam=lam, M=M)
+    # LARGER TOMO PROBLEM (128 x 128 brain)
+    if 1:
+        m = 100                 # number of x-rays
+        n_1, n_2 = 128, 128     # image dimensions
+        n = n_1*n_2             # number of pixels (ROIrecon=full image)
+        p = 50                  # number of pixels in HO ROI
+        lam = 1.0               # regularization strength
+
+        print('Generating tomo problem w/ params: ')
+        print('m: %d    n: %d   lam: %d     p: %d' % (m, n, lam, p))
+
+        # load image (brain)
+        f = np.load('tomo2D/brain128.npy')
+        f = np.array(f).reshape(n, )
+
+        # generate forward projector X, sinogram g (sb)
+        X = drt.gen_X(n_1=n_1, n_2=n_2, m=m, sp_rep=True)
+        sb = X.dot(f)
+
+        # generate covariance matrix (data space) and mask
+        Kb = sps.eye(m)
+        M = np.zeros((p, n), dtype=np.float64)
+
+        for i in range(n-p, p): M[i, i] = 1.0
+        M = sps.dia_matrix(M)
+
+        print(' X shape: ' + str(X.shape))
+        print(' f shape: ' + str(f.shape))
+        print('sb shape: ' + str(sb.shape))
+        print('Kb shape: ' + str(Kb.shape))
+        print(' M shape: ' + str(M.shape))
+
+    # CHOOSE ALGORITHM =========================================================
+    if 1:
+        uopt = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
+
+    if 0:
+        uopt = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
+
 
 
 
