@@ -110,8 +110,8 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
 
         #raw_input()
 
-    plt.plot(min_errors, marker='o')
-    plt.plot(constr_errors, marker='o')
+    plt.plot(min_errors, marker='o', markersize=3)
+    plt.plot(constr_errors, marker='o', markersize=3)
     plt.legend(['Minimization', 'Constraint'])
     plt.xlabel('Iteration')
     plt.ylabel('Absolute Error for each System')
@@ -147,11 +147,9 @@ def raar(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     """
     pass
 
-if __name__ == "__main__":
-    # CHOOSE PROBLEM ===========================================================
-
+def test(problem=0,method=1):
     # BLURRING PROBLEM
-    if 0:
+    if problem == 0:
         # problem parameters
         m = 100     # number of pixels in image space
         n = m       # number of pixels in data space
@@ -169,7 +167,7 @@ if __name__ == "__main__":
         print('Generating blur problem w/ params:')
         print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
         Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
-                    K_diag=np.ones(m, dtype=np.float64), sigma=3, t=1, \
+                    K_diag=np.ones(m, dtype=np.float64), sigma=3, t=10, \
                     sparse=True)
 
         sb = X.dot(sx)
@@ -181,7 +179,7 @@ if __name__ == "__main__":
         print('sb shape: ' + str(sb.shape))
 
     # SMALL TOMO PROBLEM (10 x 10 square)
-    if 0:
+    if problem == 1:
 
         # p and n are switched here compared to Sean's notes
 
@@ -221,7 +219,7 @@ if __name__ == "__main__":
         print(' M shape: ' + str(M.shape))
 
     # LARGER TOMO PROBLEM (128 x 128 brain)
-    if 1:
+    if problem == 2:
         m = 100                 # number of x-rays
         n_1, n_2 = 128, 128     # image dimensions
         n = n_1*n_2             # number of pixels (ROIrecon=full image)
@@ -252,26 +250,13 @@ if __name__ == "__main__":
         print('Kb shape: ' + str(Kb.shape))
         print(' M shape: ' + str(M.shape))
 
-    # CHOOSE ALGORITHM =========================================================
-    if 1:
+    if method == 1:
         uopt = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
 
-    if 0:
+    if method == 0:
         uopt = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
 
 
+if __name__ == "__main__":
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-    pass
+    test(problem=0, method=1)
