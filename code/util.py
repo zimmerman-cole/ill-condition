@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as la
+import scipy.linalg as sla
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 import optimize, traceback, sys
@@ -331,17 +332,20 @@ def gen_instance_1d(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=T
 
     return Kb, X, M
 
-def gen_M_2d(k=None, n_1=None, n_2=None, sparse=True):
-    M_1d = gen_M_1d(k=k,n=n_1,sparse=sparse)
-    M = M_1d
-    if sparse:
-        print(M_1d.toarray())
-        for i in range(n_2-1):
-            M = sps.hstack([M,M_1d])
-    else:
-        print(M_1d)
-        for i in range(n_2-1):
-            M = np.append(M,M_1d,axis=1)
+def gen_M_2d(ri=None, k=None, n_1=None, n_2=None):
+    """
+    ri: row index (beginning from zero) of interest in 2d image
+    k: (centered) window length
+    n_1: n rows of image
+    n_2: n cols of image
+    """
+    t = np.zeros(n_1)
+    t[ri] = 1
+    M = t
+    s1 = (n_2-k)/2
+    for i in range(n_2-1):
+        M = sla.block_diag(M,t)
+    M = M[s1:(s1+k),:]
     return M
 
 def scipy_sparse_to_spmatrix(A):
@@ -352,12 +356,4 @@ def scipy_sparse_to_spmatrix(A):
     SP = spmatrix(coo.data.tolist(), coo.row.tolist(), coo.col.tolist(), size=A.shape)
     return SP
 
-np.set_printoptions(linewidth=100)
-
-M2 = gen_M_2d(k=3,n_1=10,n_2=3,sparse=True)
-print(M2.shape)
-print(M2.toarray())
-
-M2 = gen_M_2d(k=3,n_1=10,n_2=3,sparse=False)
-print(M2.shape)
-print(M2)
+np.set_printoptions(linewidth=200)
