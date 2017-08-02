@@ -80,7 +80,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     u = np.zeros(n)
 
     for i in range(max_iter):
-        print('=== Iter %d =============' % i)
+        #print('=== Iter %d =============' % i)
 
         # === Solve minimization problem ================================
         u = min_solver.solve(x_0=u)
@@ -88,8 +88,8 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
         min_err = la.norm(Au - min_solver.b)
         constr_err = la.norm(Au - constr_solver.b)
 
-        print('min err: %.2f' % min_err)
-        print('constr err: %.2f\n' % constr_err)
+        #print('min err: %.2f' % min_err)
+        #print('constr err: %.2f\n' % constr_err)
 
         min_errors.append(min_err)
         constr_errors.append(constr_err)
@@ -99,8 +99,8 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
         min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
         constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
 
-        print('min err: %.2f' % min_err)
-        print('constr err: %.2f' % constr_err)
+        #print('min err: %.2f' % min_err)
+        #print('constr err: %.2f' % constr_err)
 
         min_errors.append(min_err)
         constr_errors.append(constr_err)
@@ -143,7 +143,7 @@ def raar(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     """
     raise NotImplementedError('')
 
-def test(problem=0,method=1):
+def test(problem=0,method=1, plot=True):
     """
     Problem:    0 - blurring
                 1 - small tomo problem  (10x10 square)
@@ -153,16 +153,17 @@ def test(problem=0,method=1):
                 1 - POCS
     """
 
-    lam = 10.0
+    lam = 1000.0
 
-    mask_debug = True
+    mask_debug = False
 
     # BLURRING PROBLEM
     if problem == 0:
         # problem parameters
         n = 100     # number of pixels in image space
         m = n       # number of pixels in data space (same as img space)
-        k = 10      # number of pixels in HO ROI
+        k = 20      # number of pixels in HO ROI
+        # ^20 seems to be the minimum ROI size that has the system be solvable
 
         # blur parameters
         sigma = 3
@@ -193,7 +194,23 @@ def test(problem=0,method=1):
         m = 10              # number of x-rays
         n_1, n_2 = 10, 10   # image dimensions
         n = n_1*n_2         # number of pixels (ROIrecon=full image)
-        p = 50              # number of pixels in HO ROI
+        p = 2            # number of pixels in HO ROI
+        # NOTE: ================================================================
+        # ^11 seems to be the minimum ROI size that causes the system to be
+        # able to be solved to a reasonable accuracy (~1 for 1000 iterations),
+        # regardless of lambda
+        # ===
+        # For p < 11, the system seems to be unsolvable at high accuracies.
+        # The lower the p, the farther apart the two systems/sets seem to be.
+        # ---------------------------------
+        # p value   |   error in min. term  (error in constraint term always=0)
+        # ---------------------------------
+        # 10        |   47.79
+        # 9         |   49.90                       <==== ALSO m=10 for these
+        # 8         |   64.26               NOTE: these are all for lambda=10.0.
+        # 7         |   64.26                      higher lambdas will cause
+        # 6         |   67.69                       slightly lower min. errors
+        # ---------------------------------
 
         print('Generating tomo problem w/ params: ')
         print('m: %d    n: %d   lam: %d     p: %d' % (m, n, lam, p))
@@ -211,7 +228,7 @@ def test(problem=0,method=1):
 
         # generate covariance matrix (data space) and mask
         Kb = sps.eye(m)
-        M = util.gen_M_2d(k=p, n_1=n_1, n_2=n_2, sparse=True)
+        M = util.gen_M_1d(k=p, n=n, sparse=True)
 
         if mask_debug:
             _f_ = np.zeros((n_1, n_2))
@@ -242,7 +259,9 @@ def test(problem=0,method=1):
         m = 100                 # number of x-rays
         n_1, n_2 = 128, 128     # image dimensions
         n = n_1*n_2             # number of pixels (ROIrecon=full image)
-        p = (128**2)/2          # number of pixels in HO ROI
+        p = 4500         # number of pixels in HO ROI
+        # Works (min term converges ~> 0) for at least p=4096, but takes
+        # forever (took 800.25 sec for p=8096)
 
         print('Generating tomo problem w/ params: ')
         print('m: %d    n: %d   lam: %d     p: %d' % (m, n, lam, p))
@@ -270,19 +289,20 @@ def test(problem=0,method=1):
     if method == 0:
         uopt = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
     elif method == 1:
-        #for i in range(n)
         start_time = time.time()
-        uopt, mins, cons = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, full_output=1)
+        uopt, mins, cons = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+            max_iter=10000, full_output=1)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
+        print('Final min err: %.2f' % mins[-1])
 
-
-        plt.plot(mins, marker='o', markersize=3)
-        plt.plot(cons, marker='o', markersize=3)
-        plt.legend(['Minimization', 'Constraint'])
-        plt.xlabel('Iteration')
-        plt.ylabel('Absolute Error for each System')
-        plt.show()
+        if plot:
+            plt.plot([mins[i] for i in range(len(mins)) if (i%2)], marker='o', markersize=3)
+            # plt.plot(cons, marker='o', markersize=3)
+            # plt.legend(['Minimization', 'Constraint'])
+            plt.xlabel('Iteration')
+            plt.ylabel('Absolute Error for each System')
+            plt.show()
 
     else:
         raise ValueError('Choose from 1 (POCS) or 0 (RAAR)')
@@ -290,4 +310,28 @@ def test(problem=0,method=1):
 
 if __name__ == "__main__":
 
-    test(problem=1, method=1)
+    test(problem=1, method=1, plot=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    pass
