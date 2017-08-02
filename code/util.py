@@ -3,7 +3,6 @@ import numpy.linalg as la
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 import optimize, traceback, sys
-from miscellaneous import visual
 from tomo1D import blur as blur
 from cvxopt import spmatrix
 
