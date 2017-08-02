@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as la
 import scipy.sparse as sps
 import scipy.sparse.linalg as spsla
-import util, optimize
+import util, optimize, time
 import tomo2D.drt as drt
 import matplotlib.pyplot as plt
 
@@ -110,15 +110,10 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
 
         #raw_input()
 
-    plt.plot(constr_errors, marker='o', markersize=3)
-    plt.plot(min_errors, marker='o', markersize=3)
-
-    plt.legend(['Minimization', 'Constraint'])
-    plt.xlabel('Iteration')
-    plt.ylabel('Absolute Error for each System')
-    plt.show()
-
-    return u
+    if full_output:
+        return u, min_errors, constr_errors
+    else:
+        return u
 
 def raar(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     """
@@ -158,7 +153,9 @@ def test(problem=0,method=1):
                 1 - POCS
     """
 
-    lam = 1.0
+    lam = 10.0
+
+    mask_debug = True
 
     # BLURRING PROBLEM
     if problem == 0:
@@ -208,14 +205,31 @@ def test(problem=0,method=1):
                 f[i, j] = 1
         f = f.reshape(n,)
 
-
         # generate forward projector X, sinogram g (sb)
         X = drt.gen_X(n_1=n_1, n_2=n_2, m=m, sp_rep=True)
         sb = X.dot(f)
 
         # generate covariance matrix (data space) and mask
         Kb = sps.eye(m)
-        M = util.gen_M_1d(k=p, n=n, sparse=True)
+        M = util.gen_M_2d(k=p, n_1=n_1, n_2=n_2, sparse=True)
+
+        if mask_debug:
+            _f_ = np.zeros((n_1, n_2))
+            for i in range(n_1):
+                for j in range(n_2):
+                    _f_[i][j] = float(i)
+
+            plt.figure()
+            plt.title('Original image')
+            plt.imshow(_f_)
+
+            _f_ = _f_.reshape(n, )
+            masked = M.dot(_f_).reshape(1, p)
+            plt.figure()
+            plt.title('Masked')
+            plt.imshow(masked)
+            plt.show()
+            raise
 
 
         print(' X shape: ' + str(X.shape))
@@ -228,7 +242,7 @@ def test(problem=0,method=1):
         m = 100                 # number of x-rays
         n_1, n_2 = 128, 128     # image dimensions
         n = n_1*n_2             # number of pixels (ROIrecon=full image)
-        p = 128**2                  # number of pixels in HO ROI
+        p = (128**2)/2          # number of pixels in HO ROI
 
         print('Generating tomo problem w/ params: ')
         print('m: %d    n: %d   lam: %d     p: %d' % (m, n, lam, p))
@@ -251,17 +265,29 @@ def test(problem=0,method=1):
         print('Kb shape: ' + str(Kb.shape))
         print(' M shape: ' + str(M.shape))
     else:
-        raise ValueError('Possible problems: blur, small_tomo, large_tomo')
+        raise ValueError('Possible problems: 0 (blur), 1 (small_tomo), 2 (large_tomo)')
 
-    if method == 1:
-        uopt = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
-
-    elif method == 0:
+    if method == 0:
         uopt = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
+    elif method == 1:
+        #for i in range(n)
+        start_time = time.time()
+        uopt, mins, cons = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, full_output=1)
+        t = time.time() - start_time
+        print('Took %.2f sec' % t)
+
+
+        plt.plot(mins, marker='o', markersize=3)
+        plt.plot(cons, marker='o', markersize=3)
+        plt.legend(['Minimization', 'Constraint'])
+        plt.xlabel('Iteration')
+        plt.ylabel('Absolute Error for each System')
+        plt.show()
+
     else:
-        raise ValueError('Choose from POCS or RAAR')
+        raise ValueError('Choose from 1 (POCS) or 0 (RAAR)')
 
 
 if __name__ == "__main__":
 
-    test(problem=0, method=1)
+    test(problem=1, method=1)
