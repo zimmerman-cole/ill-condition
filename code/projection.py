@@ -110,8 +110,9 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
 
         #raw_input()
 
-    plt.plot(min_errors, marker='o', markersize=3)
     plt.plot(constr_errors, marker='o', markersize=3)
+    plt.plot(min_errors, marker='o', markersize=3)
+
     plt.legend(['Minimization', 'Constraint'])
     plt.xlabel('Iteration')
     plt.ylabel('Absolute Error for each System')

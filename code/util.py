@@ -331,6 +331,19 @@ def gen_instance_1d(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=T
 
     return Kb, X, M
 
+def gen_M_2d(k=None, n_1=None, n_2=None, sparse=True):
+    M_1d = gen_M_1d(k=k,n=n_1,sparse=sparse)
+    M = M_1d
+    if sparse:
+        print(M_1d.toarray())
+        for i in range(n_2-1):
+            M = sps.hstack([M,M_1d])
+    else:
+        print(M_1d)
+        for i in range(n_2-1):
+            M = np.append(M,M_1d,axis=1)
+    return M
+
 def scipy_sparse_to_spmatrix(A):
     """
     Takes scipy sparse matrix to a cvxopt spmatrix
@@ -338,3 +351,13 @@ def scipy_sparse_to_spmatrix(A):
     coo = A.tocoo()
     SP = spmatrix(coo.data.tolist(), coo.row.tolist(), coo.col.tolist(), size=A.shape)
     return SP
+
+np.set_printoptions(linewidth=100)
+
+M2 = gen_M_2d(k=3,n_1=10,n_2=3,sparse=True)
+print(M2.shape)
+print(M2.toarray())
+
+M2 = gen_M_2d(k=3,n_1=10,n_2=3,sparse=False)
+print(M2.shape)
+print(M2)
