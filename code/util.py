@@ -352,12 +352,13 @@ def scipy_sparse_to_spmatrix(A):
     SP = spmatrix(coo.data.tolist(), coo.row.tolist(), coo.col.tolist(), size=A.shape)
     return SP
 
-np.set_printoptions(linewidth=100)
+if __name__ == "__main__":
+    np.set_printoptions(linewidth=100)
 
-M2 = gen_M_2d(k=3,n_1=10,n_2=3,sparse=True)
-print(M2.shape)
-print(M2.toarray())
+    M2 = gen_M_2d(k=3,n_1=10,n_2=3,sparse=True)
+    print(M2.shape)
+    print(M2.toarray())
 
-M2 = gen_M_2d(k=3,n_1=10,n_2=3,sparse=False)
-print(M2.shape)
-print(M2)
+    M2 = gen_M_2d(k=3,n_1=10,n_2=3,sparse=False)
+    print(M2.shape)
+    print(M2)
