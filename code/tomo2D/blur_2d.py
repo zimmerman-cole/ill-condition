@@ -78,7 +78,7 @@ def row_k(k=0, n_1=None, n_2=None, template=None, template_inds=None, sparse=Tru
     r_k = np.zeros(n_1 * n_2)
 
     ## fill in template
-    inds = [(t+k)%(n_2*n_1) for t in template_inds]
+    inds = [(t*n_1+k)%(n_2*n_1) for t in template_inds]
     r_k[inds] = template
 
     ## sparse representation
