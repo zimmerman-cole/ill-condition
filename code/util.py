@@ -4,7 +4,7 @@ import scipy.linalg as sla
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 import optimize, traceback, sys
-from tomo1D import blur as blur
+from tomo1D import blur_1d as blur_1d
 from cvxopt import spmatrix
 
 # not positive-definite
@@ -327,12 +327,12 @@ def gen_instance_1d(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=T
         M: a k x n matrix
     """
     Kb = gen_Kb(m=m, K_diag=K_diag, sparse=sparse)
-    X = blur.fwdblur_oeprator_1d(n=n, sigma=sigma, t=t, sparse=sparse)
+    X = blur_1d.fwdblur_operator_1d(n=n, sigma=sigma, t=t, sparse=sparse)
     M = gen_M_1d(k=k, n=n, sparse=sparse)
 
     return Kb, X, M
 
-def gen_M_2d(ri=None, k=None, n_1=None, n_2=None):
+def gen_M_2d(ri=None, k=None, n_1=None, n_2=None, sparse=True):
     """
     ri: row index (beginning from zero) of interest in 2d image
     k: (centered) window length
@@ -346,6 +346,8 @@ def gen_M_2d(ri=None, k=None, n_1=None, n_2=None):
     for i in range(n_2-1):
         M = sla.block_diag(M,t)
     M = M[s1:(s1+k),:]
+    if sparse:
+        M = sps.csr_matrix(M)
     return M
 
 def scipy_sparse_to_spmatrix(A):
