@@ -132,3 +132,40 @@ def fwdblur_operator_2d(n_1=10, n_2=20, sigma=3, t=10, sparse=True, plot=False, 
             X_row = np.vstack([X_row, r_k])
 
     return X_col, X_row
+
+def example(n_1=20, n_2=50, sigma=5, t=8):
+    f = gen_f_rect(n_1=n_1, n_2=n_2, levels=3, plot=True)
+
+    X_col, X_row = fwdblur_operator_2d(n_1=n_1, n_2=n_2, sigma=sigma, t=t)
+
+    fig,ax = plt.subplots(1,3)
+
+    ## COLUMN
+    _f_ = f.flatten("F").reshape(n_1*n_2,1)
+    print("dim X_col: ", X_col.toarray().shape)
+    print("dim _f_: ", _f_.shape)
+    _f_colblur = X_col.dot(_f_)
+    f_colblur = _f_colblur.reshape(n_1,n_2,order="F")
+    plt.subplot(1,3,1)
+    plt.imshow(f_colblur)
+
+    ## ROW
+    _f_ = f.flatten("F").reshape(n_1*n_2,1)
+    print("dim X_row: ", X_row.toarray().shape)
+    print("dim _f_: ", _f_.shape)
+    _f_rowblur = X_row.dot(_f_)
+    f_rowblur = _f_rowblur.reshape(n_1,n_2,order="F")
+    plt.subplot(1,3,2)
+    plt.imshow(f_rowblur)
+
+    ## BOTH
+    _f_blur = X_row.dot(_f_colblur)
+    print("dim X_col: ", X_col.toarray().shape)
+    print("dim _f_: ", _f_.shape)
+    f_blur = _f_blur.reshape(n_1,n_2,order="F")
+    plt.subplot(1,3,3)
+    plt.imshow(f_blur)
+    plt.show()
+
+if __name__ == "__main__":
+    example()
