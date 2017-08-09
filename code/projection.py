@@ -58,6 +58,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     # B default: identity
     if B is None: B = iden(n)
 
+    u = np.zeros(n)
 
     # Set up solver for minimization term
     # A.T Kb A u = A.T sb
@@ -76,8 +77,6 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
 
     min_errors = []
     constr_errors = []
-
-    u = np.zeros(n)
 
     for i in range(max_iter):
         #print('=== Iter %d =============' % i)
@@ -115,6 +114,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     else:
         return u
 
+<<<<<<< 2cde773a30a5d84711522896b5cd24397dce3807
 def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None):
     """
     Douglas-Rachford.
@@ -224,8 +224,16 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
 
 def raar(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
+=======
+def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0):
+>>>>>>> Implement RAAR; see docstring for details
     """
     Relaxed Averaged Alternating Reflections.
+        (Wed. August 9)
+        -Doesn't currently converge on our example 1D blurring problem for any
+         value of beta.
+        -Uses the T_(2,1) Douglas-Rachford instead of (1,2)
+            (reflects first across P1, then P2)
 
     Solves the system:
                  min_u || Kb^.5 A u - Kb^-.5 sb || ^2
@@ -249,7 +257,85 @@ def raar(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     Returns:
         Optimal u.
     """
-    raise NotImplementedError('')
+    n = A.shape[1]
+
+    if sps.issparse(A):
+        iden = sps.eye
+        assert sps.issparse(M)
+    else:
+        iden = np.identity
+        assert not sps.issparse(M)
+
+    # B default: identity
+    if B is None: B = iden(n)
+
+    assert 0.0 < beta and beta < 1.0
+
+    u = np.zeros(n)
+
+    # Set up solver for minimization term (P1)
+    # A.T Kb A u = A.T sb
+    min_solver = optimize.ConjugateGradientsSolver(
+        A = A.T.dot(Kb.dot(A)), b = A.T.dot(sb), full_output=0
+    )
+
+    # Set up solver for constraint term [2] (P2)
+    constr_solver = optimize.ConjugateGradientsSolver(
+        A = (iden(n) - M.T.dot(M)).dot(A.T.dot(A) + lam * B.T.dot(B)), \
+        b = np.zeros(n), full_output = 0
+    )
+
+    _min_errs_ = []
+    _con_errs_ = []
+
+    for i in range(max_iter):
+        print('=== Iter %d =============' % i)
+
+        # Calculate R_1 u ======================================================
+        P1_u = min_solver.solve(x_0=np.copy(u))     # u projected onto P1
+        R1_u = u + 2.0 * (P1_u - u)                 # u reflected across P1
+
+        # Calculate R_2 R_1 u ==================================================
+        P2_R1_u = constr_solver.solve(x_0 = np.copy(R1_u))
+        R2_R1_u = R1_u + 2.0 * (P2_R1_u - R1_u)     # u reflected across P1, then P2
+
+        # Checking doubly-reflected error for both systems
+        dr_min_err = la.norm(min_solver.A.dot(R2_R1_u) - min_solver.b)
+        dr_con_err = la.norm(constr_solver.A.dot(R2_R1_u) - constr_solver.b)
+        print('doubly-reflected errors:')
+        print('Mini: %f' % dr_min_err)
+        print('Constr: %f' % dr_con_err)
+
+
+        # Take the average of the doubly-reflected u and original u for ========
+        # Douglas-Rachford (2,1) operated u ====================================
+        T21_u = 0.5 * (u + R2_R1_u)
+
+        # Now use this to calculate RAAR-operated u ============================
+        Vb_u = beta*T21_u + (1.0-beta)*P1_u
+
+        # Now check errors/termination condition ===============================
+
+        min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
+        constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
+
+        print('min err: %.2f' % min_err)
+        print('constr err: %.2f' % constr_err)
+
+        raw_input()
+
+        _min_errs_.append(min_err)
+        _con_errs_.append(constr_err)
+
+        # P2 error=0 and P1 error <= tolerance
+        if constr_err <= 10**-6 and min_err <= tol:
+            break
+
+
+    if full_output:
+        return u, _min_errs_, _con_errs_
+    else:
+        return u
 
 def test(problem=0,method=1, plot=True):
     """
@@ -270,7 +356,7 @@ def test(problem=0,method=1, plot=True):
         # problem parameters
         n = 100     # number of pixels in image space
         m = n       # number of pixels in data space (same as img space)
-        k = 20      # number of pixels in HO ROI
+        k = 30      # number of pixels in HO ROI
         # ^20 seems to be the minimum ROI size that has the system be solvable
 
         # blur parameters
@@ -395,7 +481,9 @@ def test(problem=0,method=1, plot=True):
         raise ValueError('Possible problems: 0 (blur), 1 (small_tomo), 2 (large_tomo)')
 
     if method == 0:
-        uopt = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M)
+        beta = 0.99
+        print('RAAR method chosen; using beta=%.2f' % beta)
+        uopt = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0)
     elif method == 1:
         start_time = time.time()
         uopt, mins, cons = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
@@ -435,7 +523,11 @@ def test(problem=0,method=1, plot=True):
 
 if __name__ == "__main__":
 
+<<<<<<< 2cde773a30a5d84711522896b5cd24397dce3807
     test(problem=0, method=2, plot=True)
+=======
+    test(problem=0, method=0, plot=True)
+>>>>>>> Implement RAAR; see docstring for details
 
 
 
