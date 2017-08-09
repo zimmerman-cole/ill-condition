@@ -75,42 +75,42 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
         b = np.zeros(n), full_output = 0
     )
 
+    start_time = time.time()
+    times = []
     min_errors = []
     constr_errors = []
 
-    for i in range(max_iter):
-        #print('=== Iter %d =============' % i)
+    try:
+        for i in range(max_iter):
+            print('=== POCS Iter %d =============' % i)
 
-        # === Solve minimization problem ================================
-        u = min_solver.solve(x_0=u)
-        Au = np.array(min_solver.A.dot(u)).reshape(n, )
-        min_err = la.norm(Au - min_solver.b)
-        constr_err = la.norm(Au - constr_solver.b)
+            # === Solve minimization problem ================================
+            u = min_solver.solve(x_0=u)
+            Au = np.array(min_solver.A.dot(u)).reshape(n, )
+            min_err = la.norm(Au - min_solver.b)
+            constr_err = la.norm(Au - constr_solver.b)
 
-        #print('min err: %.2f' % min_err)
-        #print('constr err: %.2f\n' % constr_err)
+            # === Solve constraint problem ==================================
+            u = constr_solver.solve(x_0=u)
+            times.append(time.time() - start_time)
+            min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
+            constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
 
-        min_errors.append(min_err)
-        constr_errors.append(constr_err)
+            #print('min err: %.2f' % min_err)
+            #print('constr err: %.2f' % constr_err)
 
-        # === Solve constraint problem ==================================
-        u = constr_solver.solve(x_0=u)
-        min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
-        constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
+            min_errors.append(min_err)
+            constr_errors.append(constr_err)
 
-        #print('min err: %.2f' % min_err)
-        #print('constr err: %.2f' % constr_err)
+            if min_err <= tol:
+                break
 
-        min_errors.append(min_err)
-        constr_errors.append(constr_err)
-
-        if min_err <= tol:
-            break
-
-        #raw_input()
+            #raw_input()
+    except KeyboardInterrupt:
+        pass    # so you can interrupt and still return the residuals so far
 
     if full_output:
-        return u, min_errors, constr_errors
+        return u, min_errors, constr_errors, times
     else:
         return u
 
@@ -186,68 +186,71 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     t_0 = time.time()
     u_0 = np.zeros(n)
 
-    for i in range(max_iter):
-        print('=== Iter %d =============' % i)
+    try:
+        for i in range(max_iter):
+            print('=== DR Iter %d =============' % i)
 
-        if order == 12:
-            ## compute T_{1,2} - - - - - - - - - - - - - - - - - - - - - - - - - - -
-            ## first projection
-            dd = constr_solver.solve(x_0=u_0)-u_0
-            u_1 = u_0 + sl*dd
-            constr_errors.append(la.norm(constr_solver.A.dot(u_1) - constr_solver.b))
+            if order == 12:
+                ## compute T_{1,2} - - - - - - - - - - - - - - - - - - - - - - - - - - -
+                ## first projection
+                dd = constr_solver.solve(x_0=u_0)-u_0
+                u_1 = u_0 + sl*dd
+                constr_errors.append(la.norm(constr_solver.A.dot(u_1) - constr_solver.b))
 
-            ## second projection
-            v_0 = u_1
-            d = min_solver.solve(x_0=v_0)-v_0
-            v_1 = v_0 + sl*d
-            min_errors.append(la.norm(min_solver.A.dot(v_1) - min_solver.b))
+                ## second projection
+                v_0 = u_1
+                d = min_solver.solve(x_0=v_0)-v_0
+                v_1 = v_0 + sl*d
+                min_errors.append(la.norm(min_solver.A.dot(v_1) - min_solver.b))
 
-            ## average double projection with original position
-            w_0 = 0.5*(u_0 + v_1)
-            dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
-            dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
+                ## average double projection with original position
+                w_0 = 0.5*(u_0 + v_1)
+                dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+                dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
 
-            ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
-            w_1 = constr_solver.solve(x_0=w_0)
-            proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
+                ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
+                w_1 = constr_solver.solve(x_0=w_0)
+                proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
 
-            ## update
-            u_0 = w_0
+                ## update
+                u_0 = w_0
 
-            if proj_errors[-1] <= tol:
-                break
-        elif order == 21:
-            ## compute T_{2,1} - - - - - - - - - - - - - - - - - - - - - - - - - - -
-            ## first projection
-            dd = min_solver.solve(x_0=u_0)-u_0
-            u_1 = u_0 + sl*dd
-            min_errors.append(la.norm(min_solver.A.dot(u_1) - min_solver.b))
+                if proj_errors[-1] <= tol:
+                    break
+            elif order == 21:
+                ## compute T_{2,1} - - - - - - - - - - - - - - - - - - - - - - - - - - -
+                ## first projection
+                dd = min_solver.solve(x_0=u_0)-u_0
+                u_1 = u_0 + sl*dd
+                min_errors.append(la.norm(min_solver.A.dot(u_1) - min_solver.b))
 
-            ## second projection
-            v_0 = u_1
-            d = constr_solver.solve(x_0=v_0)-v_0
-            v_1 = v_0 + sl*d
-            constr_errors.append(la.norm(constr_solver.A.dot(v_1) - constr_solver.b))
+                ## second projection
+                v_0 = u_1
+                d = constr_solver.solve(x_0=v_0)-v_0
+                v_1 = v_0 + sl*d
+                constr_errors.append(la.norm(constr_solver.A.dot(v_1) - constr_solver.b))
 
-            ## average double projection with original position
-            w_0 = 0.5*(u_0 + v_1)
-            dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
-            dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+                ## average double projection with original position
+                w_0 = 0.5*(u_0 + v_1)
+                dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
+                dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
 
-            ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
-            w_1 = constr_solver.solve(x_0=w_0)
-            proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
+                ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
+                w_1 = constr_solver.solve(x_0=w_0)
+                proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
 
-            ## update
-            u_0 = w_0
+                ## update
+                u_0 = w_0
 
-            if proj_errors[-1] <= tol:
-                break
-        times.append(time.time()-t_0)
+                if proj_errors[-1] <= tol:
+                    break
+            times.append(time.time()-t_0)
+    except KeyboardInterrupt:
+        pass # so you can interrupt algorithm and still plot residuals so far
 
     ## final project onto constraint - - - - - - - - - - - - - - - - - - - - - -
     w_0 = constr_solver.solve(x_0=w_0)
-    proj_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+    #proj_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
 
 
     if full_output:
@@ -255,16 +258,10 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     else:
         return w_0
 
-
 def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0):
 
     """
     Relaxed Averaged Alternating Reflections.
-        (Wed. August 9)
-        -Doesn't currently converge on our example 1D blurring problem for any
-         value of beta.
-        -Uses the T_(2,1) Douglas-Rachford instead of (1,2)
-            (reflects first across P1, then P2)
 
     Solves the system:
                  min_u || Kb^.5 A u - Kb^-.5 sb || ^2
@@ -316,12 +313,14 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
         b = np.zeros(n), full_output = 0
     )
 
+    start_time = time.time()
+    times = []
     _min_errs_ = []
     _con_errs_ = []
 
     try:
         for i in range(max_iter):
-            print('=== Iter %d =============' % i)
+            print('=== RAAR Iter %d =============' % i)
 
             # Calculate R_1 u ======================================================
             P1_u = min_solver.solve(x_0=np.copy(u))     # u projected onto P1
@@ -342,10 +341,11 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
             p2_proj = constr_solver.solve(x_0 = Vb_u)
 
             # Check errors/termination condition ===================================
+            times.append(time.time() - start_time)
             min_err = la.norm(min_solver.A.dot(p2_proj) - min_solver.b)
             constr_err = la.norm(constr_solver.A.dot(p2_proj) - constr_solver.b)
-            print('min err: %f' % min_err)
-            print('constr err: %f' % constr_err)
+            # print('min err: %f' % min_err)
+            # print('constr err: %f' % constr_err)
 
             _min_errs_.append(min_err)
             _con_errs_.append(constr_err)
@@ -359,12 +359,12 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
         pass    # So you can interrupt the method and still plot the residuals so far
 
 
-    print('============================================')
-    print('FINAL min err: %.2f' % min_err)
-    print('FINALconstr err: %.2f' % constr_err)
+    # print('============================================')
+    # print('FINAL min err: %.2f' % min_err)
+    # print('FINALconstr err: %.2f' % constr_err)
 
     if full_output:
-        return u, _min_errs_, _con_errs_
+        return u, _min_errs_, _con_errs_, times
     else:
         return u
 
@@ -377,6 +377,8 @@ def test(problem=0,method=1, plot=True):
 
     Method:     0 - RAAR
                 1 - POCS
+                2 - DR
+                3 - Compare all
     """
 
     lam = 1000.0
@@ -519,7 +521,7 @@ def test(problem=0,method=1, plot=True):
 
         # blur parameters
         sigma = 3
-        t = 10
+        t = 100
 
         # load 1d image
         filename = 'tomo1D/f_impulse_10000.npy'
@@ -539,35 +541,35 @@ def test(problem=0,method=1, plot=True):
         print('sx shape: ' + str(sx.shape))
         print('sb shape: ' + str(sb.shape))
     else:
-        raise ValueError('Possible problems: 0 (blur), 1 (small_tomo), 2 (large_tomo)')
+        raise ValueError('Possible problems: 0,1,2,3')
 
     if method == 0:
         beta = 0.5
         print('RAAR method chosen; using beta=%.2f' % beta)
         start_time = time.time()
-        uopt, mins, cons = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
+        uopt, mins, cons, times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
             max_iter=10000, full_output=1)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
         print('Final min err: %.2f' % mins[-1])
 
         if plot:
-            plt.plot([mins[i] for i in range(len(mins)) if (i%2)], marker='o', markersize=3)
-            plt.xlabel('Iteration')
+            plt.loglog(times, mins, marker='o', markersize=3)
+            plt.xlabel('Time at current iteration')
             plt.ylabel('Absolute Error of Minimization Term')
             plt.show()
 
     elif method == 1:
         start_time = time.time()
-        uopt, mins, cons = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+        uopt, mins, cons, times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=10000, full_output=1)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
         print('Final min err: %.2f' % mins[-1])
 
         if plot:
-            plt.plot([mins[i] for i in range(len(mins)) if (i%2)], marker='o', markersize=3)
-            plt.xlabel('Iteration')
+            plt.loglog(times, mins, marker='o', markersize=3)
+            plt.xlabel('Time at current iteration')
             plt.ylabel('Absolute Error of Minimization Term')
             plt.show()
     elif method == 2:
@@ -588,14 +590,35 @@ def test(problem=0,method=1, plot=True):
             plt.xlabel('Iteration')
             plt.ylabel('Absolute Error for each System')
             plt.show()
+    elif method == 3:
+        beta = 0.5
+        print('RAAR: beta=%f' % beta)
+        _, raar_mins, _, raar_times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
+            max_iter=10000, full_output=1)
+        _, pocs_mins, _, pocs_times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+            max_iter=10000, full_output=1)
+        _, _, _, _, _, dr_mins, dr_times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+            max_iter=10000, full_output=1, order=21)
+
+
+
+        plt.loglog(raar_times, raar_mins, marker='o', markersize=3)
+        plt.loglog(pocs_times, pocs_mins, marker='o', markersize=3)
+
+        plt.loglog(dr_times, dr_mins, marker='o', markersize=3)
+        plt.xlabel('Time at current iteration')
+        plt.ylabel('Absolute Error of Minimization Term')
+        plt.legend(['RAAR', 'POCS', 'DR'])
+        plt.show()
+
     else:
-        raise ValueError('Choose from 1 (POCS) or 0 (RAAR)')
+        raise ValueError('Possible methods: 0,1,2,3')
 
 
 if __name__ == "__main__":
 
     # test(problem=0, method=2, plot=True)
-    test(problem=3, method=0, plot=True)
+    test(problem=2, method=3, plot=True)
 
 
 
