@@ -117,20 +117,12 @@ def fwdblur_operator_2d(n_1=10, n_2=20, sigma=3, t=10, sparse=True, plot=False, 
             X_col = sla.block_diag((X_col,B_col))
 
     ## ROW BLUR - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-    ## define block
+    ## still slower than `col` version; poor sparse performance
     template, template_inds = blur_1d.template_1d(sigma=sigma, t=t, debug=debug)
+    r0 = row_k(k=0, n_1=n_1, n_2=n_2, template=template, template_inds=template_inds, sparse=False, debug=debug)
+    X_row = sla.circulant(r0).T
     if sparse:
-        X_row = row_k(k=0, n_1=n_1, n_2=n_2, template=template, template_inds=template_inds, sparse=True, debug=debug)
-        for k in range(1, n_1*n_2):
-            r_k = row_k(k=k, n_1=n_1, n_2=n_2, template=template, template_inds=template_inds, sparse=True, debug=debug)
-            X_row = sps.vstack([X_row, r_k])
-    else:
-        X_row = row_k(k=0, n_1=n_1, n_2=n_2, template=template, template_inds=template_inds, sparse=False, debug=debug)
-        for k in range(1, n_1*n_2):
-            r_k = row_k(k=k, n_1=n_1, n_2=n_2, template=template, template_inds=template_inds, sparse=False, debug=debug)
-            X_row = np.vstack([X_row, r_k])
-
+        X_row = sps.csr_matrix(X_row)
     return X_col, X_row
 
 def example(n_1=20, n_2=50, sigma=5, t=8):
@@ -169,3 +161,15 @@ def example(n_1=20, n_2=50, sigma=5, t=8):
 
 if __name__ == "__main__":
     example()
+    # n_1 = 5
+    # n_2 = 7
+    # sigma = 3
+    # t = 3
+    # template, template_inds = blur_1d.template_1d(sigma=sigma, t=t, debug=False)
+    # r0 = row_k(k=0, n_1=n_1, n_2=n_2, template=template, template_inds=template_inds, sparse=True, debug=True)
+    # r0 = np.round_(r0,2)
+    #
+    # r1 = row_k(k=1, n_1=n_1, n_2=n_2, template=template, template_inds=template_inds, sparse=True, debug=True)
+    # r1 = np.round_(r1,2)
+    # print(r0.toarray(), "r0")
+    # print(r1.toarray(), "r1")
