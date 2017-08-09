@@ -312,56 +312,46 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     _min_errs_ = []
     _con_errs_ = []
 
-    for i in range(max_iter):
-        print('=== Iter %d =============' % i)
+    try:
+        for i in range(max_iter):
+            print('=== Iter %d =============' % i)
 
-        # Calculate R_1 u ======================================================
-        P1_u = min_solver.solve(x_0=np.copy(u))     # u projected onto P1
-        R1_u = u + 2.0 * (P1_u - u)                 # u reflected across P1
+            # Calculate R_1 u ======================================================
+            P1_u = min_solver.solve(x_0=np.copy(u))     # u projected onto P1
+            R1_u = u + 2.0 * (P1_u - u)                 # u reflected across P1
 
-        # Calculate R_2 R_1 u ==================================================
-        P2_R1_u = constr_solver.solve(x_0 = np.copy(R1_u))
-        R2_R1_u = R1_u + 2.0 * (P2_R1_u - R1_u)     # u reflected across P1, then P2
+            # Calculate R_2 R_1 u ==================================================
+            P2_R1_u = constr_solver.solve(x_0 = np.copy(R1_u))
+            R2_R1_u = R1_u + 2.0 * (P2_R1_u - R1_u)     # u reflected across P1, then P2
 
-        # Checking doubly-reflected error for both systems
-        dr_min_err = la.norm(min_solver.A.dot(R2_R1_u) - min_solver.b)
-        dr_con_err = la.norm(constr_solver.A.dot(R2_R1_u) - constr_solver.b)
-        print('doubly-reflected errors:')
-        print('Mini: %f' % dr_min_err)
-        print('Constr: %f' % dr_con_err)
+            # Take the average of the doubly-reflected u and original u for ========
+            # Douglas-Rachford (2,1) operated u ====================================
+            T21_u = 0.5 * (u + R2_R1_u)
+
+            # Now use this to calculate RAAR-operated u ============================
+            Vb_u = beta*T21_u + (1.0-beta)*P1_u
+
+            # Now project onto P2 (ensure constraint is completely satisfied) ======
+            p2_proj = constr_solver.solve(x_0 = Vb_u)
+
+            # Check errors/termination condition ===================================
+            min_err = la.norm(min_solver.A.dot(p2_proj) - min_solver.b)
+            constr_err = la.norm(constr_solver.A.dot(p2_proj) - constr_solver.b)
+            print('min err: %f' % min_err)
+            print('constr err: %f' % constr_err)
+
+            _min_errs_.append(min_err)
+            _con_errs_.append(constr_err)
+
+            u = p2_proj
+
+            # P2 error=0 and P1 error <= tolerance
+            if constr_err <= 10**-6 and min_err <= tol:
+                break
+    except KeyboardInterrupt:
+        pass    # So you can interrupt the method and still plot the residuals so far
 
 
-        # Take the average of the doubly-reflected u and original u for ========
-        # Douglas-Rachford (2,1) operated u ====================================
-        T21_u = 0.5 * (u + R2_R1_u)
-
-        # Now use this to calculate RAAR-operated u ============================
-        Vb_u = beta*T21_u + (1.0-beta)*P1_u
-
-        # Now check errors/termination condition ===============================
-
-        min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
-        constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
-
-        print('min err: %.2f' % min_err)
-        print('constr err: %.2f' % constr_err)
-
-        # raw_input()
-
-        _min_errs_.append(min_err)
-        _con_errs_.append(constr_err)
-
-        # P2 error=0 and P1 error <= tolerance
-        if constr_err <= 10**-6 and min_err <= tol:
-            break
-
-        u = Vb_u
-
-    u = constr_solver.solve(x_0 = np.copy(u))
-    min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
-    constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
-    _con_errs_.append(constr_err)
-    _min_errs_.append(min_err)
     print('============================================')
     print('FINAL min err: %.2f' % min_err)
     print('FINALconstr err: %.2f' % constr_err)
@@ -373,9 +363,10 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
 
 def test(problem=0,method=1, plot=True):
     """
-    Problem:    0 - blurring
+    Problem:    0 - small 1D blurring problem (100 pixels total)
                 1 - small tomo problem  (10x10 square)
                 2 - large tomo problem  (128x128 brain)
+                3 - large 1D blurring problem (10000 pixels total)
 
     Method:     0 - RAAR
                 1 - POCS
@@ -385,12 +376,12 @@ def test(problem=0,method=1, plot=True):
 
     mask_debug = False
 
-    # BLURRING PROBLEM
+    # SMALL 1D BLURRING PROBLEM (100 pixels)
     if problem == 0:
         # problem parameters
         n = 100     # number of pixels in image space
         m = n       # number of pixels in data space (same as img space)
-        k = 30      # number of pixels in HO ROI
+        k = 20      # number of pixels in HO ROI
         # ^20 seems to be the minimum ROI size that has the system be solvable
 
         # blur parameters
@@ -511,13 +502,53 @@ def test(problem=0,method=1, plot=True):
         print('sb shape: ' + str(sb.shape))
         print('Kb shape: ' + str(Kb.shape))
         print(' M shape: ' + str(M.shape))
+    # LARGER BLURRING PROBLEM (10000 pixels)
+    elif problem == 3:
+        # problem parameters
+        n = 10000   # number of pixels in image space
+        m = n       # number of pixels in data space (same as img space)
+        k = 1999      # number of pixels in HO ROI
+        # ^___ seems to be the minimum ROI size that has the system be solvable
+
+        # blur parameters
+        sigma = 3
+        t = 10
+
+        # load 1d image
+        filename = 'tomo1D/f_impulse_10000.npy'
+        sx = np.load(filename)
+
+        print('Generating blur problem w/ params:')
+        print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
+        Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
+                    K_diag=np.ones(m, dtype=np.float64), sigma=3, t=10, \
+                    sparse=True)
+
+        sb = X.dot(sx)
+
+        print('Kb shape: ' + str(Kb.shape))
+        print(' X shape: ' + str(X.shape))
+        print(' M shape: ' + str(M.shape))
+        print('sx shape: ' + str(sx.shape))
+        print('sb shape: ' + str(sb.shape))
     else:
         raise ValueError('Possible problems: 0 (blur), 1 (small_tomo), 2 (large_tomo)')
 
     if method == 0:
-        beta = 0.99
+        beta = 0.5
         print('RAAR method chosen; using beta=%.2f' % beta)
-        uopt = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0)
+        start_time = time.time()
+        uopt, mins, cons = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
+            max_iter=10000, full_output=1)
+        t = time.time() - start_time
+        print('Took %.2f sec' % t)
+        print('Final min err: %.2f' % mins[-1])
+
+        if plot:
+            plt.plot([mins[i] for i in range(len(mins)) if (i%2)], marker='o', markersize=3)
+            plt.xlabel('Iteration')
+            plt.ylabel('Absolute Error of Minimization Term')
+            plt.show()
 
     elif method == 1:
         start_time = time.time()
@@ -529,10 +560,8 @@ def test(problem=0,method=1, plot=True):
 
         if plot:
             plt.plot([mins[i] for i in range(len(mins)) if (i%2)], marker='o', markersize=3)
-            # plt.plot(cons, marker='o', markersize=3)
-            # plt.legend(['Minimization', 'Constraint'])
             plt.xlabel('Iteration')
-            plt.ylabel('Absolute Error for each System')
+            plt.ylabel('Absolute Error of Minimization Term')
             plt.show()
     elif method == 2:
         start_time = time.time()
@@ -558,8 +587,8 @@ def test(problem=0,method=1, plot=True):
 
 if __name__ == "__main__":
 
-    test(problem=0, method=2, plot=True)
-    # test(problem=0, method=0, plot=False)
+    # test(problem=0, method=2, plot=True)
+    test(problem=3, method=0, plot=True)
 
 
 
