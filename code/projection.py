@@ -114,7 +114,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     else:
         return u
 
-def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None):
+def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None, sl=None):
     """
     Douglas-Rachford.
 
@@ -138,6 +138,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
          tol:     Desired accuracy for minimization problem
                     (linear constraint must be completely accurate).
        order:     12 = T_12; 21 = T_21
+          sl:     step length, default is 2 (i.e., reflection)
 
         full_output: TODO - for plotting intermediate info...
 
@@ -156,6 +157,8 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
         assert not sps.issparse(M)
     # B default: identity
     if B is None: B = iden(n)
+    # sl default: reflection
+    if sl is None: sl = 2.
 
     ## operator - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # A.T Kb A u = A.T sb
@@ -178,6 +181,9 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     dr_constr_errors = []   # dr constraint errors (before projection onto constraint)
     proj_errors = []        # min errors after dr step projected onto constraint
 
+    times = []
+
+    t_0 = time.time()
     u_0 = np.zeros(n)
 
     for i in range(max_iter):
@@ -187,13 +193,13 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
             ## compute T_{1,2} - - - - - - - - - - - - - - - - - - - - - - - - - - -
             ## first projection
             dd = constr_solver.solve(x_0=u_0)-u_0
-            u_1 = u_0 + 2.*dd
+            u_1 = u_0 + sl*dd
             constr_errors.append(la.norm(constr_solver.A.dot(u_1) - constr_solver.b))
 
             ## second projection
             v_0 = u_1
             d = min_solver.solve(x_0=v_0)-v_0
-            v_1 = v_0 + 2.*d
+            v_1 = v_0 + sl*d
             min_errors.append(la.norm(min_solver.A.dot(v_1) - min_solver.b))
 
             ## average double projection with original position
@@ -214,13 +220,13 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
             ## compute T_{2,1} - - - - - - - - - - - - - - - - - - - - - - - - - - -
             ## first projection
             dd = min_solver.solve(x_0=u_0)-u_0
-            u_1 = u_0 + 2.*dd
+            u_1 = u_0 + sl*dd
             min_errors.append(la.norm(min_solver.A.dot(u_1) - min_solver.b))
 
             ## second projection
             v_0 = u_1
             d = constr_solver.solve(x_0=v_0)-v_0
-            v_1 = v_0 + 2.*d
+            v_1 = v_0 + sl*d
             constr_errors.append(la.norm(constr_solver.A.dot(v_1) - constr_solver.b))
 
             ## average double projection with original position
@@ -237,6 +243,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
             if proj_errors[-1] <= tol:
                 break
+        times.append(time.time()-t_0)
 
     ## final project onto constraint - - - - - - - - - - - - - - - - - - - - - -
     w_0 = constr_solver.solve(x_0=w_0)
@@ -244,7 +251,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
 
     if full_output:
-        return w_0, min_errors, constr_errors, dr_min_errors, dr_constr_errors, proj_errors
+        return w_0, min_errors, constr_errors, dr_min_errors, dr_constr_errors, proj_errors, times
     else:
         return w_0
 
@@ -565,7 +572,7 @@ def test(problem=0,method=1, plot=True):
             plt.show()
     elif method == 2:
         start_time = time.time()
-        w_opt, mins, constrs, dr_mins, dr_constrs, projs = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.001, \
+        w_opt, mins, constrs, dr_mins, dr_constrs, projs, times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.001, \
             max_iter=10000, full_output=1, order=21)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
