@@ -137,7 +137,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     max_iter:     Max number of iterations.
          tol:     Desired accuracy for minimization problem
                     (linear constraint must be completely accurate).
-       order:     None = Constr -> Min; else = Min -> Constr
+       order:     12 = T_12; 21 = T_21
 
         full_output: TODO - for plotting intermediate info...
 
@@ -183,33 +183,60 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     for i in range(max_iter):
         print('=== Iter %d =============' % i)
 
-        ## compute T_{1,2} - - - - - - - - - - - - - - - - - - - - - - - - - - -
+        if order == 12:
+            ## compute T_{1,2} - - - - - - - - - - - - - - - - - - - - - - - - - - -
+            ## first projection
+            dd = constr_solver.solve(x_0=u_0)-u_0
+            u_1 = u_0 + 2.*dd
+            constr_errors.append(la.norm(constr_solver.A.dot(u_1) - constr_solver.b))
 
-        ## first projection
-        dd = constr_solver.solve(x_0=u_0)-u_0
-        u_1 = u_0 + 2.*dd
-        constr_errors.append(la.norm(constr_solver.A.dot(u_1) - constr_solver.b))
+            ## second projection
+            v_0 = u_1
+            d = min_solver.solve(x_0=v_0)-v_0
+            v_1 = v_0 + 2.*d
+            min_errors.append(la.norm(min_solver.A.dot(v_1) - min_solver.b))
 
-        ## second projection
-        v_0 = u_1
-        d = min_solver.solve(x_0=v_0)-v_0
-        v_1 = v_0 + 2.*d
-        min_errors.append(la.norm(min_solver.A.dot(v_1) - min_solver.b))
+            ## average double projection with original position
+            w_0 = 0.5*(u_0 + v_1)
+            dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+            dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
 
-        ## average double projection with original position
-        w_0 = 0.5*(u_0 + v_1)
-        dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
-        dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
+            ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
+            w_1 = constr_solver.solve(x_0=w_0)
+            proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
 
-        ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
-        w_1 = constr_solver.solve(x_0=w_0)
-        proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
+            ## update
+            u_0 = w_0
 
-        ## update
-        u_0 = w_0
+            if proj_errors[-1] <= tol:
+                break
+        elif order == 21:
+            ## compute T_{2,1} - - - - - - - - - - - - - - - - - - - - - - - - - - -
+            ## first projection
+            dd = min_solver.solve(x_0=u_0)-u_0
+            u_1 = u_0 + 2.*dd
+            min_errors.append(la.norm(min_solver.A.dot(u_1) - min_solver.b))
 
-        if proj_errors[-1] <= tol:
-            break
+            ## second projection
+            v_0 = u_1
+            d = constr_solver.solve(x_0=v_0)-v_0
+            v_1 = v_0 + 2.*d
+            constr_errors.append(la.norm(constr_solver.A.dot(v_1) - constr_solver.b))
+
+            ## average double projection with original position
+            w_0 = 0.5*(u_0 + v_1)
+            dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
+            dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+
+            ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
+            w_1 = constr_solver.solve(x_0=w_0)
+            proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
+
+            ## update
+            u_0 = w_0
+
+            if proj_errors[-1] <= tol:
+                break
 
     ## final project onto constraint - - - - - - - - - - - - - - - - - - - - - -
     w_0 = constr_solver.solve(x_0=w_0)
@@ -510,7 +537,7 @@ def test(problem=0,method=1, plot=True):
     elif method == 2:
         start_time = time.time()
         w_opt, mins, constrs, dr_mins, dr_constrs, projs = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.001, \
-            max_iter=10000, full_output=1)
+            max_iter=10000, full_output=1, order=21)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
         print('Final min err: %.2f' % mins[-1])
@@ -531,8 +558,8 @@ def test(problem=0,method=1, plot=True):
 
 if __name__ == "__main__":
 
-    # test(problem=0, method=2, plot=True)
-    test(problem=0, method=0, plot=False)
+    test(problem=0, method=2, plot=True)
+    # test(problem=0, method=0, plot=False)
 
 
 
