@@ -250,11 +250,10 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
     ## final project onto constraint - - - - - - - - - - - - - - - - - - - - - -
     w_0 = constr_solver.solve(x_0=w_0)
-    #proj_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
-
+    proj_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
 
     if full_output:
-        return w_0, min_errors, constr_errors, dr_min_errors, dr_constr_errors, proj_errors, times
+        return w_0[0:len(times)], min_errors[0:len(times)], constr_errors[0:len(times)], dr_min_errors[0:len(times)], dr_constr_errors[0:len(times)], proj_errors[0:len(times)], times
     else:
         return w_0
 
@@ -598,7 +597,7 @@ def test(problem=0,method=1, plot=True):
         _, pocs_mins, _, pocs_times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=10000, full_output=1)
         _, _, _, _, _, dr_mins, dr_times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
-            max_iter=10000, full_output=1, order=21)
+            max_iter=10000, full_output=1, order=21, sl=1.5)
 
 
 
