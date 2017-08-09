@@ -115,6 +115,114 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     else:
         return u
 
+def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None):
+    """
+    Douglas-Rachford.
+
+    Solves the system:
+        [1] (min) min_u   || Kb^.5 A u - Kb^-.5 sb || ^2
+
+        [2] (constr) s.t.    (I - M.T M)(A.T A + lam B.T B) u = 0
+
+        with:   R_i = 2P_i - I  (for i = 1, 2)
+                T_{1,2} = (1/2)(R_1 R_2 + I)
+    ============================================================================
+    Args:
+          Kb:     Covariance matrix (in data space).
+           A:     Forward projector/blurrer.
+          sb:     Signal in data space.
+         lam:     Regularization strength.
+           M:     Mask matrix.
+           B:     Regularization matrix (i.e. identity or
+                        finite differencing).
+    max_iter:     Max number of iterations.
+         tol:     Desired accuracy for minimization problem
+                    (linear constraint must be completely accurate).
+       order:     None = Constr -> Min; else = Min -> Constr
+
+        full_output: TODO - for plotting intermediate info...
+
+    Returns:
+        Optimal u.
+    """
+    ## setup - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    # shape
+    n = A.shape[1]
+    # sparsity
+    if sps.issparse(A):
+        iden = sps.eye
+        assert sps.issparse(M)
+    else:
+        iden = np.identity
+        assert not sps.issparse(M)
+    # B default: identity
+    if B is None: B = iden(n)
+
+    ## operator - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    # A.T Kb A u = A.T sb
+    min_solver = optimize.ConjugateGradientsSolver(
+        A = A.T.dot(Kb.dot(A)), b = A.T.dot(sb), full_output=0
+    )
+    # (I - M.T M)(A.T A + lam B.T B) u = 0
+    constr_solver = optimize.ConjugateGradientsSolver(
+        A = (iden(n) - M.T.dot(M)).dot(A.T.dot(A) + lam * B.T.dot(B)), \
+        b = np.zeros(n), full_output = 0
+    )
+
+    print('M.T M shape: ' + str(M.T.dot(M).shape))
+    print('X.T X shape: ' + str(A.T.dot(A).shape))
+    print('B.T B shape: ' + str(B.T.dot(B).shape))
+
+    min_errors = []         #
+    constr_errors = []      #
+    dr_min_errors = []      # dr min obj errors (before projection onto constraint)
+    dr_constr_errors = []   # dr constraint errors (before projection onto constraint)
+    proj_errors = []        # min errors after dr step projected onto constraint
+
+    u_0 = np.zeros(n)
+
+    for i in range(max_iter):
+        print('=== Iter %d =============' % i)
+
+        ## compute T_{1,2} - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+        ## first projection
+        dd = constr_solver.solve(x_0=u_0)-u_0
+        u_1 = u_0 + 2.*dd
+        constr_errors.append(la.norm(constr_solver.A.dot(u_1) - constr_solver.b))
+
+        ## second projection
+        v_0 = u_1
+        d = min_solver.solve(x_0=v_0)-v_0
+        v_1 = v_0 + 2.*d
+        min_errors.append(la.norm(min_solver.A.dot(v_1) - min_solver.b))
+
+        ## average double projection with original position
+        w_0 = 0.5*(u_0 + v_1)
+        dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+        dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
+
+        ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
+        w_1 = constr_solver.solve(x_0=w_0)
+        proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
+
+        ## update
+        u_0 = w_0
+
+        if proj_errors[-1] <= tol:
+            break
+
+    ## final project onto constraint - - - - - - - - - - - - - - - - - - - - - -
+    w_0 = constr_solver.solve(x_0=w_0)
+    proj_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+
+
+    if full_output:
+        return w_0, min_errors, constr_errors, dr_min_errors, dr_constr_errors, proj_errors
+    else:
+        return w_0
+
+
 def raar(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     """
     Relaxed Averaged Alternating Reflections.
@@ -303,14 +411,31 @@ def test(problem=0,method=1, plot=True):
             plt.xlabel('Iteration')
             plt.ylabel('Absolute Error for each System')
             plt.show()
+    elif method == 2:
+        start_time = time.time()
+        w_opt, mins, constrs, dr_mins, dr_constrs, projs = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.001, \
+            max_iter=10000, full_output=1)
+        t = time.time() - start_time
+        print('Took %.2f sec' % t)
+        print('Final min err: %.2f' % mins[-1])
 
+        if plot:
+            plt.loglog([mins[i] for i in range(len(mins)) if (i%2)], marker='o', markersize=10)
+            plt.loglog(constrs, marker='o', markersize=10)
+            plt.loglog(dr_mins, marker='o', markersize=6)
+            plt.loglog(dr_constrs, marker='o', markersize=6)
+            plt.loglog(projs, marker='o', markersize=3)
+            plt.legend(['Minimization', 'Constraint', 'DR-mins', 'DR-constrs', 'Projs'])
+            plt.xlabel('Iteration')
+            plt.ylabel('Absolute Error for each System')
+            plt.show()
     else:
         raise ValueError('Choose from 1 (POCS) or 0 (RAAR)')
 
 
 if __name__ == "__main__":
 
-    test(problem=1, method=1, plot=True)
+    test(problem=0, method=2, plot=True)
 
 
 
