@@ -114,7 +114,6 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     else:
         return u
 
-<<<<<<< 2cde773a30a5d84711522896b5cd24397dce3807
 def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None):
     """
     Douglas-Rachford.
@@ -223,10 +222,8 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
         return w_0
 
 
-def raar(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
-=======
 def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0):
->>>>>>> Implement RAAR; see docstring for details
+
     """
     Relaxed Averaged Alternating Reflections.
         (Wed. August 9)
@@ -322,7 +319,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
         print('min err: %.2f' % min_err)
         print('constr err: %.2f' % constr_err)
 
-        raw_input()
+        # raw_input()
 
         _min_errs_.append(min_err)
         _con_errs_.append(constr_err)
@@ -331,6 +328,16 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
         if constr_err <= 10**-6 and min_err <= tol:
             break
 
+        u = Vb_u
+
+    u = constr_solver.solve(x_0 = np.copy(u))
+    min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
+    constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
+    _con_errs_.append(constr_err)
+    _min_errs_.append(min_err)
+    print('============================================')
+    print('FINAL min err: %.2f' % min_err)
+    print('FINALconstr err: %.2f' % constr_err)
 
     if full_output:
         return u, _min_errs_, _con_errs_
@@ -484,6 +491,7 @@ def test(problem=0,method=1, plot=True):
         beta = 0.99
         print('RAAR method chosen; using beta=%.2f' % beta)
         uopt = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0)
+
     elif method == 1:
         start_time = time.time()
         uopt, mins, cons = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
@@ -523,12 +531,8 @@ def test(problem=0,method=1, plot=True):
 
 if __name__ == "__main__":
 
-<<<<<<< 2cde773a30a5d84711522896b5cd24397dce3807
-    test(problem=0, method=2, plot=True)
-=======
-    test(problem=0, method=0, plot=True)
->>>>>>> Implement RAAR; see docstring for details
-
+    # test(problem=0, method=2, plot=True)
+    test(problem=0, method=0, plot=False)
 
 
 
