@@ -430,11 +430,15 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
             _min_errs_.append(min_err)
             _con_errs_.append(constr_err)
 
-            u = p2_proj
+            ## update u with RAAR step
+            u = Vb_u
 
             # P2 error=0 and P1 error <= tolerance
-            if constr_err <= 10**-6 and min_err <= tol:
+            if min_err <= tol:  # constr_err <= 10**-6 and
                 break
+
+        ## project onto constraint at the end
+        u = constr_solver.solve(x_0 = u)
     except KeyboardInterrupt:
         pass    # So you can interrupt the method and still plot the residuals so far
 
@@ -674,7 +678,7 @@ def test(problem=0,method=1, plot=True):
         beta = 0.5
         print('RAAR: beta=%f' % beta)
         _, raar_mins, _, raar_times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
-            max_iter=10000, full_output=1, sl=1.5)
+            max_iter=10000, full_output=1, sl=2.)
         _, pocs_mins, _, pocs_times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=10000, full_output=1)
         _, _, _, _, _, dr_mins, dr_times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
