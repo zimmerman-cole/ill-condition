@@ -6,6 +6,7 @@ import util, optimize, time, traceback, sys
 import tomo2D.drt as drt
 import matplotlib.pyplot as plt
 from tomo2D import blur_2d as blur_2d
+import template
 
 """
 Projection-based methods:
@@ -79,6 +80,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     times = []
     min_errors = []
     constr_errors = []
+    us = []
 
     try:
         for i in range(max_iter):
@@ -98,6 +100,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
 
             #print('min err: %.2f' % min_err)
             #print('constr err: %.2f' % constr_err)
+            us.append(u)
 
             min_errors.append(min_err)
             constr_errors.append(constr_err)
@@ -110,7 +113,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
         pass    # so you can interrupt and still return the residuals so far
 
     if full_output:
-        return u, min_errors, constr_errors, times
+        return u, min_errors, constr_errors, times, us
     else:
         return u
 
@@ -176,6 +179,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     dr_min_errors = []      # dr min obj errors (before projection onto constraint)
     dr_constr_errors = []   # dr constraint errors (before projection onto constraint)
     proj_errors = []        # min errors after dr step projected onto constraint
+    us = []
 
     times = []
 
@@ -210,6 +214,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
                 ## update
                 u_0 = w_0
+                us.append(u_0)
 
                 if proj_errors[-1] <= tol:
                     break
@@ -237,6 +242,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
                 ## update
                 u_0 = w_0
+                us.append(u_0)
 
                 if proj_errors[-1] <= tol:
                     break
@@ -246,11 +252,12 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
     ## final project onto constraint - - - - - - - - - - - - - - - - - - - - - -
     w_0 = constr_solver.solve(x_0=w_0)
+    us.append(w_0)
     proj_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
 
     if full_output:
         l = len(times)
-        return w_0[1:(l+1)], min_errors[0:l], constr_errors[0:l], dr_min_errors[0:l], dr_constr_errors[0:l], proj_errors[0:l], times
+        return w_0[1:(l+1)], min_errors[0:l], constr_errors[0:l], dr_min_errors[0:l], dr_constr_errors[0:l], proj_errors[0:l], times, us[0:l]
     else:
         return w_0
 
@@ -317,6 +324,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     times = []
     _min_errs_ = []
     _con_errs_ = []
+    us = []
 
     try:
         for i in range(max_iter):
@@ -352,6 +360,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
 
             ## update u with RAAR step
             u = Vb_u
+            us.append(u)
 
             # P2 error=0 and P1 error <= tolerance
             if min_err <= tol:  # constr_err <= 10**-6 and
@@ -359,6 +368,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
 
         ## project onto constraint at the end
         u = constr_solver.solve(x_0 = u)
+        us.append(u)
         min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
         times.append(time.time() - start_time)
         _min_errs_.append(min_err)
@@ -372,7 +382,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     # print('FINALconstr err: %.2f' % constr_err)
 
     if full_output:
-        return u, _min_errs_, _con_errs_, times
+        return u, _min_errs_, _con_errs_, times, us
     else:
         return u
 
@@ -583,7 +593,7 @@ def test(problem=0,method=1, plot=True):
         beta = 0.5
         print('RAAR method chosen; using beta=%.2f' % beta)
         start_time = time.time()
-        uopt, mins, cons, times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
+        uopt, mins, cons, times, _ = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
             max_iter=10000, full_output=1)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
@@ -596,7 +606,7 @@ def test(problem=0,method=1, plot=True):
             plt.show()
     elif method == 1:
         start_time = time.time()
-        uopt, mins, cons, times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+        uopt, mins, cons, times, _ = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=10000, full_output=1)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
@@ -609,7 +619,7 @@ def test(problem=0,method=1, plot=True):
             plt.show()
     elif method == 2:
         start_time = time.time()
-        w_opt, mins, constrs, dr_mins, dr_constrs, projs, times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.001, \
+        w_opt, mins, constrs, dr_mins, dr_constrs, projs, times, _ = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.001, \
             max_iter=10000, full_output=1, order=21)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
@@ -629,13 +639,30 @@ def test(problem=0,method=1, plot=True):
 
         beta = 0.5
         print('RAAR: beta=%.4f\n' % beta)
+        B = sps.eye(n_1*n_2)
 
-        _, raar_mins, _, raar_times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
+        _, raar_mins, _, raar_times, raars = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
             max_iter=200, full_output=1, sl=2.)
-        _, pocs_mins, _, pocs_times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+        _, pocs_mins, _, pocs_times, pocss = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=200, full_output=1)
-        _, _, _, _, _, dr_mins, dr_times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+        _, _, _, _, _, dr_mins, dr_times, drs = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=200, full_output=1, order=12, sl=1.5)
+        minres_A, minres_b = template.gen_ESI_system(X=X, Kb=Kb, B=B, M=M, lam=lam, sb=sb)
+        _, _, minres_xs, minres_resids, minres_times = spsla.minres_track(A=minres_A, b=minres_b)
+
+        ## compute errors
+        R_direct = template.direct_rxn(X=X, lam=lam)
+        w_direct, Kx, sx = template.direct_solve(Kb=Kb, R=R_direct, M=M, sb=sb)
+
+        Z = X.T.dot(X) + lam*B.T.dot(B)
+        raar_errs = [la.norm(M.dot(Z).dot(u)-w_direct) for u in raars]
+        pocs_errs = [la.norm(M.dot(Z).dot(u)-w_direct) for u in pocss]
+        dr_errs = [la.norm(M.dot(Z).dot(u)-w_direct) for u in drs]
+        print(Z.shape)
+        print(minres_xs[0][0:(n_1*n_2)].shape)
+
+
+        minres_errs = [la.norm(M.dot(Z).dot(u[0:(n_1*n_2)])-w_direct) for u in minres_xs]
 
         def use_loglog(_list_): return _list_[0] >= 100.0*_list_[-1]
 
@@ -643,15 +670,38 @@ def test(problem=0,method=1, plot=True):
             plt.loglog(raar_times, raar_mins, marker='o', markersize=3)
             plt.loglog(pocs_times, pocs_mins, marker='o', markersize=3)
             plt.loglog(dr_times, dr_mins, marker='o', markersize=3)
+            plt.loglog(minres_times, minres_resids, marker='o', markersize=3)
         else:
             plt.plot(raar_times, raar_mins, marker='o', markersize=3)
             plt.plot(pocs_times, pocs_mins, marker='o', markersize=3)
             plt.plot(dr_times, dr_mins, marker='o', markersize=3)
+            plt.plot(minres_times, minres_resids, marker='o', markersize=3)
 
+
+        ## plot residuals
         plt.xlabel('Time at current iteration')
-        plt.ylabel('Absolute Error of Minimization Term')
-        plt.legend(['RAAR', 'POCS', 'DR'])
+        plt.ylabel('Absolute Residual of Minimization Term')
+        plt.legend(['RAAR', 'POCS', 'DR', 'MINRES'])
         plt.show()
+
+        if use_loglog(raar_mins) or use_loglog(pocs_mins) or use_loglog(dr_mins):
+            plt.loglog(raar_times, raar_errs, marker='o', markersize=3)
+            plt.loglog(pocs_times, pocs_errs, marker='o', markersize=3)
+            plt.loglog(dr_times, dr_errs, marker='o', markersize=3)
+            plt.loglog(minres_times, minres_errs, marker='o', markersize=3)
+        else:
+            plt.plot(raar_times, raar_errs, marker='o', markersize=3)
+            plt.plot(pocs_times, pocs_errs, marker='o', markersize=3)
+            plt.plot(dr_times, dr_errs, marker='o', markersize=3)
+            plt.plot(minres_times, minres_errs, marker='o', markersize=3)
+
+
+        ## plot residuals
+        plt.xlabel('Time at current iteration')
+        plt.ylabel('Error of Minimization Term (vs direct solve)')
+        plt.legend(['RAAR', 'POCS', 'DR', 'MINRES'])
+        plt.show()
+
 
     else:
         raise ValueError('Possible methods: 0,1,2,3')
