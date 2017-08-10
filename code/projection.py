@@ -330,7 +330,8 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     proj_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
 
     if full_output:
-        return w_0[0:len(times)], min_errors[0:len(times)], constr_errors[0:len(times)], dr_min_errors[0:len(times)], dr_constr_errors[0:len(times)], proj_errors[0:len(times)], times
+        l = len(times)
+        return w_0[1:(l+1)], min_errors[0:l], constr_errors[0:l], dr_min_errors[0:l], dr_constr_errors[0:l], proj_errors[0:l], times
     else:
         return w_0
 
@@ -439,6 +440,9 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
 
         ## project onto constraint at the end
         u = constr_solver.solve(x_0 = u)
+        min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
+        _min_errs_.append(min_err)
+
     except KeyboardInterrupt:
         pass    # So you can interrupt the method and still plot the residuals so far
 
@@ -448,7 +452,8 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     # print('FINALconstr err: %.2f' % constr_err)
 
     if full_output:
-        return u, _min_errs_, _con_errs_, times
+        l = len(times)
+        return u, _min_errs_[1:(l+1)], _con_errs_, times
     else:
         return u
 
