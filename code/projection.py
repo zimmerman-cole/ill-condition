@@ -8,88 +8,14 @@ import matplotlib.pyplot as plt
 from tomo2D import blur_2d as blur_2d
 
 """
-Projection-based methods
+Projection-based methods:
     -POCS
     -Douglas-Rachford
     -RAAR
+
+These methods are made SPECIFICALLY to solve this one system; they are NOT
+general implementations.
 """
-
-def test_orthogonal(Kb, X, sb, lam, M, B=None, proj=None, x_0=None):
-    """
-    A in R^[m x n]
-    b in R^m
-    x_0 in R^n
-    """
-
-    ## projection setup
-    if proj == "obj":
-        ## proj1: obj
-        A = X.T.dot(Kb.dot(X))
-        b = X.T.dot(sb)
-    elif proj == "constr":
-        ## proj2: constr
-        A = (iden(n) - M.T.dot(M)).dot(X.T.dot(X) + lam * B.T.dot(B))
-        b = np.zeros(n)
-    else:
-        print("projection is either `obj` or `constr`")
-        sys.exit(o)
-
-    ## dimensions
-    m = A.shape[0]
-    n = A.shape[1]
-
-    ## start
-    if x_0 is None:
-        x_0 = np.zeros(n)
-
-    ## project
-    cgs = optimize.ConjugateGradientsSolver(A = A, b = b, full_output = 0)
-    x_p = cgs.solve(x_0=x_0)
-
-    ## difference vector
-    d = x_p - x_0
-
-    ## orthogonality
-    x = []
-    for i in range(m):
-        ai = A[i,:].toarray().reshape(n,)
-        x.append(-d.dot(x_p-ai))
-        # print(A[i,:].dot(d))
-    x = np.array(x)
-    print(float(sum( x <= 0 ))/m)
-
-## example usage: --------------------------------------------------------------
-# # problem parameters
-# n = 100     # number of pixels in image space
-# m = n       # number of pixels in data space (same as img space)
-# k = 20      # number of pixels in HO ROI
-# # ^20 seems to be the minimum ROI size that has the system be solvable
-# lam = 100
-#
-# # blur parameters
-# sigma = 3
-# t = 10
-#
-# # load 1d image
-# filename = 'tomo1D/f_impulse_100.npy'
-# sx = np.load(filename)
-#
-# print('Generating blur problem w/ params:')
-# print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
-# Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
-#             K_diag=np.ones(m, dtype=np.float64), sigma=3, t=10, \
-#             sparse=True)
-#
-# sb = X.dot(sx)
-#
-# print('Kb shape: ' + str(Kb.shape))
-# print(' X shape: ' + str(X.shape))
-# print(' M shape: ' + str(M.shape))
-# print('sx shape: ' + str(sx.shape))
-# print('sb shape: ' + str(sb.shape))
-#
-# test_orthogonal(Kb=Kb, X=X, sb=sb, lam=lam, M=M, B=None, proj="obj")
-## example usage: --------------------------------------------------------------
 
 def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     """
@@ -143,9 +69,6 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
         A = A.T.dot(Kb.dot(A)), b = A.T.dot(sb), full_output=0
     )
 
-    print('M.T M shape: ' + str(M.T.dot(M).shape))
-    print('X.T X shape: ' + str(A.T.dot(A).shape))
-    print('B.T B shape: ' + str(B.T.dot(B).shape))
     # Set up solver for constraint term [2]
     constr_solver = optimize.ConjugateGradientsSolver(
         A = (iden(n) - M.T.dot(M)).dot(A.T.dot(A) + lam * B.T.dot(B)), \
@@ -247,10 +170,6 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
         A = (iden(n) - M.T.dot(M)).dot(A.T.dot(A) + lam * B.T.dot(B)), \
         b = np.zeros(n), full_output = 0
     )
-
-    print('M.T M shape: ' + str(M.T.dot(M).shape))
-    print('X.T X shape: ' + str(A.T.dot(A).shape))
-    print('B.T B shape: ' + str(B.T.dot(B).shape))
 
     min_errors = []         #
     constr_errors = []      #
@@ -707,9 +626,10 @@ def test(problem=0,method=1, plot=True):
             plt.ylabel('Absolute Error for each System')
             plt.show()
     elif method == 3:
-        beta = 0.5
 
-        print('RAAR: beta=%f\n' % beta)
+        beta = 0.5
+        print('RAAR: beta=%.4f\n' % beta)
+
         _, raar_mins, _, raar_times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
             max_iter=200, full_output=1, sl=2.)
         _, pocs_mins, _, pocs_times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
@@ -717,11 +637,17 @@ def test(problem=0,method=1, plot=True):
         _, _, _, _, _, dr_mins, dr_times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=200, full_output=1, order=12, sl=1.5)
 
+        def use_loglog(_list_): return _list_[0] >= 100.0*_list_[-1]
 
-        plt.loglog(raar_times, raar_mins, marker='o', markersize=3)
-        plt.loglog(pocs_times, pocs_mins, marker='o', markersize=3)
+        if use_loglog(raar_mins) or use_loglog(pocs_mins) or use_loglog(dr_mins):
+            plt.loglog(raar_times, raar_mins, marker='o', markersize=3)
+            plt.loglog(pocs_times, pocs_mins, marker='o', markersize=3)
+            plt.loglog(dr_times, dr_mins, marker='o', markersize=3)
+        else:
+            plt.plot(raar_times, raar_mins, marker='o', markersize=3)
+            plt.plot(pocs_times, pocs_mins, marker='o', markersize=3)
+            plt.plot(dr_times, dr_mins, marker='o', markersize=3)
 
-        plt.loglog(dr_times, dr_mins, marker='o', markersize=3)
         plt.xlabel('Time at current iteration')
         plt.ylabel('Absolute Error of Minimization Term')
         plt.legend(['RAAR', 'POCS', 'DR'])
@@ -729,6 +655,8 @@ def test(problem=0,method=1, plot=True):
 
     else:
         raise ValueError('Possible methods: 0,1,2,3')
+
+    print('\nGHETTO COMMAND LINE \n')
 
     while True:
         try:
@@ -742,9 +670,82 @@ def test(problem=0,method=1, plot=True):
             sys.stdout.flush()
         except KeyboardInterrupt:
             print
-            raise SystemExit
+            break
         except Exception:
             traceback.print_exc()
+
+def test_orthogonal(Kb, X, sb, lam, M, B=None, proj=None, x_0=None):
+    """
+    Test if CG acts as an orthogonal projector.
+    ==============
+    A in R^[m x n]
+    b in R^m
+    x_0 in R^n
+    ==============
+    === Example usage: =============================================================
+    # problem parameters
+    n = 100     # number of pixels in image space
+    m = n       # number of pixels in data space (same as img space)
+    k = 20      # number of pixels in HO ROI
+    lam = 100   # regularization strength
+
+    # blur parameters
+    sigma = 3
+    t = 10
+
+    # load image
+    filename = 'tomo1D/f_impulse_100.npy'
+    sx = np.load(filename)
+
+    print('Generating blur problem w/ params:')
+    print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
+    Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
+                K_diag=np.ones(m, dtype=np.float64), sigma=3, t=10, \
+                sparse=True)
+
+    sb = X.dot(sx)
+
+    test_orthogonal(Kb=Kb, X=X, sb=sb, lam=lam, M=M, B=None, proj="obj")
+    ================================================================================
+    """
+
+    ## projection setup
+    if proj == "obj":
+        ## proj1: obj
+        A = X.T.dot(Kb.dot(X))
+        b = X.T.dot(sb)
+    elif proj == "constr":
+        ## proj2: constr
+        A = (iden(n) - M.T.dot(M)).dot(X.T.dot(X) + lam * B.T.dot(B))
+        b = np.zeros(n)
+    else:
+        print("projection is either `obj` or `constr`")
+        sys.exit(o)
+
+    ## dimensions
+    m = A.shape[0]
+    n = A.shape[1]
+
+    ## start
+    if x_0 is None:
+        x_0 = np.zeros(n)
+
+    ## project
+    cgs = optimize.ConjugateGradientsSolver(A = A, b = b, full_output = 0)
+    x_p = cgs.solve(x_0=x_0)
+
+    ## difference vector
+    d = x_p - x_0
+
+    ## orthogonality
+    x = []
+    for i in range(m):
+        ai = A[i,:].toarray().reshape(n,)
+        x.append(-d.dot(x_p-ai))
+        # print(A[i,:].dot(d))
+    x = np.array(x)
+    print(float(sum( x <= 0 ))/m)
+
 
 if __name__ == "__main__":
 
