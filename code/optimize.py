@@ -574,6 +574,8 @@ class ConjugateGradientsSolver(Solver):
         else:
             restart_mtd = str(kwargs['restart_mtd'])
 
+        ## reshape bug fix
+        self.b = self.b.reshape(len(self.b),)
 
         start_time = time.time()
         if x_true is not None:
@@ -657,6 +659,9 @@ class ConjugateGradientsSolver(Solver):
             recalc = 20
         else:
             recalc = int(kwargs['recalc'])
+
+        ## reshape bug fix
+        self.b = self.b.reshape(len(self.b),)
 
         # First descent step (GD) ==============================================
         r = self.b - self.A.dot(x)

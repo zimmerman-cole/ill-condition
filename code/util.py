@@ -5,6 +5,7 @@ import scipy.sparse as sps
 import matplotlib.pyplot as plt
 import optimize, traceback, sys
 from tomo1D import blur_1d as blur_1d
+from tomo2D import blur_2d as blur_2d
 from cvxopt import spmatrix
 
 # not positive-definite
@@ -334,11 +335,18 @@ def gen_instance_1d(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=T
 
 def gen_M_2d(ri=None, k=None, n_1=None, n_2=None, sparse=True):
     """
-    ri: row index (beginning from zero) of interest in 2d image
-    k: (centered) window length
-    n_1: n rows of image
-    n_2: n cols of image
+    Generates a mask `M` to extract the middle `k` pixels from image row `ri`
+    Args:
+        ri: row index (beginning from zero) of interest in 2d image
+        k: (centered) window length
+        n_1: n rows of image
+        n_2: n cols of image
+    Returns:
+        M: mask operator matrix
     """
+    if ri is None:
+        ri = int(float(n_1)/2.)
+
     t = np.zeros(n_1)
     t[ri] = 1
     M = t
@@ -349,6 +357,27 @@ def gen_M_2d(ri=None, k=None, n_1=None, n_2=None, sparse=True):
     if sparse:
         M = sps.csr_matrix(M)
     return M
+
+def gen_instance_2d(m, n_1, n_2, ri=None, k=None, K_diag=None, sigma=3, t=10, sparse=True):
+    """
+    Args
+        m: dimension of data space
+        n_1: num rows of image
+        n_2: num cols of image
+            --> n: (= n_1 * n_2) dimension of image space (number of 2d pixels)
+        ri: row index for HO-ROI
+        k: dimension of ROI
+        sigma: gaussian blur standard deviation
+        t: gaussian blur pixel window size
+    Returns
+        M: a k x n matrix
+    """
+    Kb = gen_Kb(m=m, K_diag=K_diag, sparse=sparse)
+    X_col, X_row = blur_2d.fwdblur_operator_2d(n_1=n_1, n_2=n_2, sigma=sigma, t=t, sparse=sparse)
+    X = X_col.dot(X_row)
+    M = gen_M_2d(ri=ri, k=k, n_1=n_1, n_2=n_2, sparse=sparse)
+
+    return Kb, X, M
 
 def scipy_sparse_to_spmatrix(A):
     """

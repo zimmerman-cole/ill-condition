@@ -5,7 +5,7 @@ import scipy.sparse.linalg as spsla
 import util, optimize, time
 import tomo2D.drt as drt
 import matplotlib.pyplot as plt
-
+from tomo2D import blur_2d as blur_2d
 
 """
 Projection-based methods
@@ -381,6 +381,9 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     assert 0.0 < beta and beta < 1.0
 
     u = np.zeros(n)
+    print('M.T M shape: ' + str(M.T.dot(M).shape))
+    print('X.T X shape: ' + str(A.T.dot(A).shape))
+    print('B.T B shape: ' + str(B.T.dot(B).shape))
 
     # Set up solver for minimization term (P1)
     # A.T Kb A u = A.T sb
@@ -629,6 +632,36 @@ def test(problem=0,method=1, plot=True):
         print(' M shape: ' + str(M.shape))
         print('sx shape: ' + str(sx.shape))
         print('sb shape: ' + str(sb.shape))
+
+    ## 2D blur
+    elif problem == 4:
+        # problem parameters
+        n_1 = 20
+        n_2 = 50
+        n = n_1*n_2
+        m = n        # number of pixels in data space (same as img space)
+        k = 50       # number of pixels in HO ROI
+
+        # blur parameters
+        sigma = 3
+        t = 10
+
+        # create 2d image
+        f = blur_2d.gen_f_rect(n_1=n_1, n_2=n_2, levels=3)
+        sx = f.flatten("F").reshape(n_1*n_2,1)
+
+        print('Generating blur problem w/ params:')
+        print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
+        Kb, X, M = util.gen_instance_2d(m=m, n_1=n_1, n_2=n_2, k=k, sigma=sigma, t=t, \
+                                        sparse=True, K_diag=np.ones(m, dtype=np.float64))
+        sb = X.dot(sx)
+
+        print('Kb shape: ' + str(Kb.shape))
+        print(' X shape: ' + str(X.shape))
+        print(' M shape: ' + str(M.shape))
+        print('sx shape: ' + str(sx.shape))
+        print('sb shape: ' + str(sb.shape))
+
     else:
         raise ValueError('Possible problems: 0,1,2,3')
 
@@ -683,11 +716,11 @@ def test(problem=0,method=1, plot=True):
         beta = 0.5
         print('RAAR: beta=%f' % beta)
         _, raar_mins, _, raar_times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
-            max_iter=10000, full_output=1, sl=2.)
+            max_iter=200, full_output=1, sl=2.)
         _, pocs_mins, _, pocs_times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
-            max_iter=10000, full_output=1)
+            max_iter=200, full_output=1)
         _, _, _, _, _, dr_mins, dr_times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
-            max_iter=10000, full_output=1, order=12, sl=1.5)
+            max_iter=200, full_output=1, order=12, sl=1.5)
 
 
 
@@ -707,7 +740,7 @@ def test(problem=0,method=1, plot=True):
 if __name__ == "__main__":
 
     # test(problem=0, method=2, plot=True)
-    test(problem=2, method=3, plot=True)
+    test(problem=4, method=3, plot=True)
 
 
 
