@@ -704,6 +704,9 @@ class ConjugateGradientsSolver(Solver):
         else:
             recalc = int(kwargs['recalc'])
 
+        ## reshape bug fix
+        self.b = self.b.reshape(len(self.b),)
+
         self._check_ready()
         if x_0 is None:
             x = np.zeros(self.A.shape[0])
