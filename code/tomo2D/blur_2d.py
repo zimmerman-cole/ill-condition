@@ -30,8 +30,7 @@ def gen_f_rect(n_1, n_2, levels=3, save=False, plot=True):
     c_2 = int(np.floor(n_2/2.))
 
     if levels >= min(c_1,c_2):
-        print("too many levels for pixel resolution; reduce levels")
-        raise
+        raise ValueError("too many levels for pixel resolution; reduce levels")
 
     for l in range(levels+1,1,-1):
         i = c_1 - l*step_1
@@ -106,7 +105,7 @@ def fwdblur_operator_2d(n_1=10, n_2=20, sigma=3, t=10, sparse=True, plot=False, 
     ## define block
     B_col = blur_1d.fwdblur_operator_1d(n=n_1, sigma=sigma, t=t, sparse=sparse, plot=plot, debug=debug)
 
-    print(type(B_col),"B_col type")
+    #print(type(B_col),"B_col type")
 
     X_col = B_col
     if sparse:

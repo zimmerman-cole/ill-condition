@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as la
 import scipy.sparse as sps
 import scipy.sparse.linalg as spsla
-import util, optimize, time
+import util, optimize, time, traceback, sys
 import tomo2D.drt as drt
 import matplotlib.pyplot as plt
 from tomo2D import blur_2d as blur_2d
@@ -381,9 +381,6 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     assert 0.0 < beta and beta < 1.0
 
     u = np.zeros(n)
-    print('M.T M shape: ' + str(M.T.dot(M).shape))
-    print('X.T X shape: ' + str(A.T.dot(A).shape))
-    print('B.T B shape: ' + str(B.T.dot(B).shape))
 
     # Set up solver for minimization term (P1)
     # A.T Kb A u = A.T sb
@@ -444,6 +441,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
         ## project onto constraint at the end
         u = constr_solver.solve(x_0 = u)
         min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
+        times.append(time.time() - start_time)
         _min_errs_.append(min_err)
 
     except KeyboardInterrupt:
@@ -455,8 +453,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     # print('FINALconstr err: %.2f' % constr_err)
 
     if full_output:
-        l = len(times)
-        return u, _min_errs_[1:(l+1)], _con_errs_, times
+        return u, _min_errs_, _con_errs_, times
     else:
         return u
 
@@ -632,7 +629,6 @@ def test(problem=0,method=1, plot=True):
         print(' M shape: ' + str(M.shape))
         print('sx shape: ' + str(sx.shape))
         print('sb shape: ' + str(sb.shape))
-
     ## 2D blur
     elif problem == 4:
         # problem parameters
@@ -640,14 +636,14 @@ def test(problem=0,method=1, plot=True):
         n_2 = 50
         n = n_1*n_2
         m = n        # number of pixels in data space (same as img space)
-        k = 50       # number of pixels in HO ROI
+        k = 100       # number of pixels in HO ROI
 
         # blur parameters
         sigma = 3
         t = 10
 
         # create 2d image
-        f = blur_2d.gen_f_rect(n_1=n_1, n_2=n_2, levels=3)
+        f = blur_2d.gen_f_rect(n_1=n_1, n_2=n_2, levels=3, plot=False)
         sx = f.flatten("F").reshape(n_1*n_2,1)
 
         print('Generating blur problem w/ params:')
@@ -660,8 +656,7 @@ def test(problem=0,method=1, plot=True):
         print(' X shape: ' + str(X.shape))
         print(' M shape: ' + str(M.shape))
         print('sx shape: ' + str(sx.shape))
-        print('sb shape: ' + str(sb.shape))
-
+        print('sb shape: ' + str(sb.shape) + '\n')
     else:
         raise ValueError('Possible problems: 0,1,2,3')
 
@@ -680,7 +675,6 @@ def test(problem=0,method=1, plot=True):
             plt.xlabel('Time at current iteration')
             plt.ylabel('Absolute Error of Minimization Term')
             plt.show()
-
     elif method == 1:
         start_time = time.time()
         uopt, mins, cons, times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
@@ -714,14 +708,14 @@ def test(problem=0,method=1, plot=True):
             plt.show()
     elif method == 3:
         beta = 0.5
-        print('RAAR: beta=%f' % beta)
+
+        print('RAAR: beta=%f\n' % beta)
         _, raar_mins, _, raar_times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
             max_iter=200, full_output=1, sl=2.)
         _, pocs_mins, _, pocs_times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=200, full_output=1)
         _, _, _, _, _, dr_mins, dr_times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=200, full_output=1, order=12, sl=1.5)
-
 
 
         plt.loglog(raar_times, raar_mins, marker='o', markersize=3)
@@ -736,6 +730,21 @@ def test(problem=0,method=1, plot=True):
     else:
         raise ValueError('Possible methods: 0,1,2,3')
 
+    while True:
+        try:
+            sys.stdout.write('>>> ')
+            inp = raw_input()
+            if inp=='continue':
+                break
+            else:
+                exec(inp)
+
+            sys.stdout.flush()
+        except KeyboardInterrupt:
+            print
+            raise SystemExit
+        except Exception:
+            traceback.print_exc()
 
 if __name__ == "__main__":
 

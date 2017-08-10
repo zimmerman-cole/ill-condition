@@ -152,8 +152,8 @@ def ghetto_command_line():
     """
     Unfinished
     """
-    num_mem = 100 # number of past commands to remember
-    past_commands = []
+    print
+
     while True:
         try:
             sys.stdout.write('>>> ')
@@ -161,12 +161,13 @@ def ghetto_command_line():
             if inp=='continue':
                 break
             else:
-                past_commands.append(inp)
                 exec(inp)
+
+            sys.stdout.flush()
         except KeyboardInterrupt:
-            print('')
+            print
             break
-        except BaseException:
+        except Exception:
             traceback.print_exc()
 
 def iter_vs_cnum(solver, n_range=None, cnum_range=None, verbose=0, \
