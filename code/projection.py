@@ -10,9 +10,86 @@ import matplotlib.pyplot as plt
 """
 Projection-based methods
     -POCS
+    -Douglas-Rachford
     -RAAR
-    -...
 """
+
+def test_orthogonal(Kb, X, sb, lam, M, B=None, proj=None, x_0=None):
+    """
+    A in R^[m x n]
+    b in R^m
+    x_0 in R^n
+    """
+
+    ## projection setup
+    if proj == "obj":
+        ## proj1: obj
+        A = X.T.dot(Kb.dot(X))
+        b = X.T.dot(sb)
+    elif proj == "constr":
+        ## proj2: constr
+        A = (iden(n) - M.T.dot(M)).dot(X.T.dot(X) + lam * B.T.dot(B))
+        b = np.zeros(n)
+    else:
+        print("projection is either `obj` or `constr`")
+        sys.exit(o)
+
+    ## dimensions
+    m = A.shape[0]
+    n = A.shape[1]
+
+    ## start
+    if x_0 is None:
+        x_0 = np.zeros(n)
+
+    ## project
+    cgs = optimize.ConjugateGradientsSolver(A = A, b = b, full_output = 0)
+    x_p = cgs.solve(x_0=x_0)
+
+    ## difference vector
+    d = x_p - x_0
+
+    ## orthogonality
+    x = []
+    for i in range(m):
+        ai = A[i,:].toarray().reshape(n,)
+        x.append(-d.dot(x_p-ai))
+        # print(A[i,:].dot(d))
+    x = np.array(x)
+    print(float(sum( x <= 0 ))/m)
+
+## example usage: --------------------------------------------------------------
+# # problem parameters
+# n = 100     # number of pixels in image space
+# m = n       # number of pixels in data space (same as img space)
+# k = 20      # number of pixels in HO ROI
+# # ^20 seems to be the minimum ROI size that has the system be solvable
+# lam = 100
+#
+# # blur parameters
+# sigma = 3
+# t = 10
+#
+# # load 1d image
+# filename = 'tomo1D/f_impulse_100.npy'
+# sx = np.load(filename)
+#
+# print('Generating blur problem w/ params:')
+# print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
+# Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
+#             K_diag=np.ones(m, dtype=np.float64), sigma=3, t=10, \
+#             sparse=True)
+#
+# sb = X.dot(sx)
+#
+# print('Kb shape: ' + str(Kb.shape))
+# print(' X shape: ' + str(X.shape))
+# print(' M shape: ' + str(M.shape))
+# print('sx shape: ' + str(sx.shape))
+# print('sb shape: ' + str(sb.shape))
+#
+# test_orthogonal(Kb=Kb, X=X, sb=sb, lam=lam, M=M, B=None, proj="obj")
+## example usage: --------------------------------------------------------------
 
 def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
     """
@@ -257,7 +334,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     else:
         return w_0
 
-def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0):
+def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0, sl=None):
 
     """
     Relaxed Averaged Alternating Reflections.
@@ -278,6 +355,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     max_iter:     Max number of iterations.
          tol:     Desired accuracy for minimization problem
                     (linear constraint must be completely accurate).
+          sl:     step length, default is 2 (i.e., reflection)
 
         full_output: TODO - for plotting intermediate info...
 
@@ -295,6 +373,9 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
 
     # B default: identity
     if B is None: B = iden(n)
+
+    # sl default: reflection
+    if sl is None: sl = 2.
 
     assert 0.0 < beta and beta < 1.0
 
@@ -323,11 +404,11 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
 
             # Calculate R_1 u ======================================================
             P1_u = min_solver.solve(x_0=np.copy(u))     # u projected onto P1
-            R1_u = u + 2.0 * (P1_u - u)                 # u reflected across P1
+            R1_u = u + sl * (P1_u - u)                 # u reflected across P1
 
             # Calculate R_2 R_1 u ==================================================
             P2_R1_u = constr_solver.solve(x_0 = np.copy(R1_u))
-            R2_R1_u = R1_u + 2.0 * (P2_R1_u - R1_u)     # u reflected across P1, then P2
+            R2_R1_u = R1_u + sl * (P2_R1_u - R1_u)     # u reflected across P1, then P2
 
             # Take the average of the doubly-reflected u and original u for ========
             # Douglas-Rachford (2,1) operated u ====================================
@@ -580,7 +661,7 @@ def test(problem=0,method=1, plot=True):
         print('Final min err: %.2f' % mins[-1])
 
         if plot:
-            plt.loglog([mins[i] for i in range(len(mins)) if (i%2)], marker='o', markersize=10)
+            plt.loglog(mins, marker='o', markersize=10)
             plt.loglog(constrs, marker='o', markersize=10)
             plt.loglog(dr_mins, marker='o', markersize=6)
             plt.loglog(dr_constrs, marker='o', markersize=6)
@@ -593,11 +674,11 @@ def test(problem=0,method=1, plot=True):
         beta = 0.5
         print('RAAR: beta=%f' % beta)
         _, raar_mins, _, raar_times = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
-            max_iter=10000, full_output=1)
+            max_iter=10000, full_output=1, sl=1.5)
         _, pocs_mins, _, pocs_times = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
             max_iter=10000, full_output=1)
         _, _, _, _, _, dr_mins, dr_times = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
-            max_iter=10000, full_output=1, order=21, sl=1.5)
+            max_iter=10000, full_output=1, order=12, sl=1.5)
 
 
 
