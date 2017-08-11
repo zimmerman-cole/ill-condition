@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import optimize, traceback, sys
 from tomo1D import blur_1d as blur_1d
 from tomo2D import blur_2d as blur_2d
+import tomo2D.drt as drt
 from cvxopt import spmatrix
 
 # not positive-definite
@@ -317,7 +318,7 @@ def gen_M_1d(k=None, n=None, sparse=True):
         M = M[s1:(s1+k),:]
     return M
 
-def gen_instance_1d(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=True):
+def gen_instance_1d_blur(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=True):
     """
     Args
         m: dimension of data space
@@ -333,6 +334,24 @@ def gen_instance_1d(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, sparse=T
     M = gen_M_1d(k=k, n=n, sparse=sparse)
 
     return Kb, X, M
+
+def gen_instance_1d_xray(m=None, n_1=None, n_2=None, k=None, K_diag=None, sparse=True):
+    """
+    Args
+        m: dimension of data space
+        k: dimension of ROI
+        n_1: row of image space (number of 1d pixels)
+        n_2: col of image space (number of 1d pixels)
+    Returns
+        M: a k x n matrix
+    """
+    n = n_1*n_2
+    Kb = gen_Kb(m=m, K_diag=K_diag, sparse=sparse)
+    X = drt.gen_X(n_1=n_1, n_2=n_2, m=m, sp_rep=sparse)
+    M = gen_M_1d(k=k, n=n, sparse=sparse)
+
+    return Kb, X, M
+
 
 def gen_M_2d(ri=None, k=None, n_1=None, n_2=None, sparse=True):
     """
@@ -359,7 +378,7 @@ def gen_M_2d(ri=None, k=None, n_1=None, n_2=None, sparse=True):
         M = sps.csr_matrix(M)
     return M
 
-def gen_instance_2d(m, n_1, n_2, ri=None, k=None, K_diag=None, sigma=3, t=10, sparse=True):
+def gen_instance_2d_blur(m, n_1, n_2, ri=None, k=None, K_diag=None, sigma=None, t=None, sparse=True):
     """
     Args
         m: dimension of data space
@@ -381,6 +400,26 @@ def gen_instance_2d(m, n_1, n_2, ri=None, k=None, K_diag=None, sigma=3, t=10, sp
 
     return Kb, X, M
 
+def gen_instance_2d_xray(m, n_1, n_2, ri=None, k=None, K_diag=None, sparse=True):
+    """
+    Args
+        m: dimension of data space
+        n_1: num rows of image
+        n_2: num cols of image
+            --> n: (= n_1 * n_2) dimension of image space (number of 2d pixels)
+        ri: row index for HO-ROI
+        k: dimension of ROI
+        sigma: gaussian blur standard deviation
+        t: gaussian blur pixel window size
+    Returns
+        M: a k x n matrix
+    """
+    Kb = gen_Kb(m=m, K_diag=K_diag, sparse=sparse)
+    X = drt.gen_X(n_1=n_1, n_2=n_2, m=m, sp_rep=sparse)
+    M = gen_M_2d(ri=ri, k=k, n_1=n_1, n_2=n_2, sparse=sparse)
+
+    return Kb, X, M
+
 def scipy_sparse_to_spmatrix(A):
     """
     Takes scipy sparse matrix to a cvxopt spmatrix
@@ -388,3 +427,108 @@ def scipy_sparse_to_spmatrix(A):
     coo = A.tocoo()
     SP = spmatrix(coo.data.tolist(), coo.row.tolist(), coo.col.tolist(), size=A.shape)
     return SP
+
+def calc_ho(X=None, B=None, lam=None, M=None, u=None):
+    m, n = X.shape[0], X.shape[1]
+    if B is None: B = sps.eye(n)
+
+    ## intermediate matrix
+    Z = X.T.dot(X) + lam*B.T.dot(B)
+
+    return M.dot(Z).dot(u)
+
+def direct_rxn(X=None, lam=None, B=None, sparse=True):
+    n = X.shape[1]
+    if B is None:
+        B = np.diag(np.ones(n))
+        A = X.T.dot(X) + lam*B.T.dot(B)
+    A = X.T.dot(X) + lam*B.T.dot(B)
+    if sparse:
+        R = spsla.spsolve(A, X.T, use_umfpack=True)
+    else:
+        R = la.solve(A, X.T)
+    return R
+
+def direct_solve(Kb=None, R=None, M=None, lam=None, B=None, sb=None, sparse=True):
+    MR = M.dot(R)
+    print(MR.shape, "MR")
+    print(Kb.shape, "Kb")
+    Lx = MR.dot(Kb)
+    Kx = Lx.dot(MR.T)
+    sx = MR.dot(sb)
+    if sparse:
+        w = spsla.spsolve(Kx,sx)
+    else:
+        w = la.solve(Kx,sx)
+    return w, Kx, sx
+
+def gen_ESI_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None):
+    """
+    Generates "Equivalent Symmetric Indefinite" LHS and RHS based on III
+    """
+    m, n = X.shape[0], X.shape[1]
+    if B is None: B = sps.eye(n)
+
+    ## intermediate calc
+    Z = (X.T.dot(X) + lam*B.T.dot(B))
+
+    ## block LHS
+    A11 = X.T.dot(Kb).dot(X)
+    A12 = Z.dot(sps.eye(n) - M.T.dot(M))
+    A21 = A12.T
+    A22 = np.zeros([n,n])
+    A = sps.bmat([[A11,A12], [A21,None]])
+
+    ## block RHS
+    b1 = X.T.dot(sb)
+    b = np.concatenate([b1.reshape(n,), np.zeros(n).reshape(n,)])
+
+    return A, b
+
+def direct_rxn(X=None, lam=None, B=None, sparse=True):
+    n = X.shape[1]
+    if B is None:
+        B = np.diag(np.ones(n))
+        A = X.T.dot(X) + lam*B.T.dot(B)
+    A = X.T.dot(X) + lam*B.T.dot(B)
+    if sparse:
+        R = spsla.spsolve(A, X.T, use_umfpack=True)
+    else:
+        R = la.solve(A, X.T)
+    return R
+
+def direct_solve(Kb=None, R=None, M=None, lam=None, B=None, sb=None, sparse=True):
+    MR = M.dot(R)
+    print(MR.shape, "MR")
+    print(Kb.shape, "Kb")
+    Lx = MR.dot(Kb)
+    Kx = Lx.dot(MR.T)
+    sx = MR.dot(sb)
+    if sparse:
+        w = spsla.spsolve(Kx,sx)
+    else:
+        w = la.solve(Kx,sx)
+    return w, Kx, sx
+
+def gen_ESI_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None):
+    """
+    Generates "Equivalent Symmetric Indefinite" LHS and RHS based on III
+    """
+    m, n = X.shape[0], X.shape[1]
+    if B is None: B = sps.eye(n)
+
+    ## intermediate calc
+    Z = (X.T.dot(X) + lam*B.T.dot(B))
+
+    ## block LHS
+    A11 = X.T.dot(Kb).dot(X)
+    A12 = Z.dot(sps.eye(n) - M.T.dot(M))
+    A21 = A12.T
+    A22 = np.zeros([n,n])
+    A = sps.bmat([[A11,A12], [A21,None]])
+
+    ## block RHS
+    b1 = X.T.dot(sb)
+    b = np.concatenate([b1.reshape(n,), np.zeros(n).reshape(n,)])
+
+    return A, b
