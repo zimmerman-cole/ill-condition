@@ -377,6 +377,7 @@ def gen_instance_2d(m, n_1, n_2, ri=None, k=None, K_diag=None, sigma=3, t=10, sp
     X_col, X_row = blur_2d.fwdblur_operator_2d(n_1=n_1, n_2=n_2, sigma=sigma, t=t, sparse=sparse)
     X = X_col.dot(X_row)
     M = gen_M_2d(ri=ri, k=k, n_1=n_1, n_2=n_2, sparse=sparse)
+    #M = gen_M_1d(k=k, n=n_1*n_2, sparse=sparse)
 
     return Kb, X, M
 

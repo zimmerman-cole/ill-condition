@@ -399,9 +399,7 @@ def test(problem=0,method=1, plot=True):
                 3 - Compare all
     """
 
-    lam = 1000.0
-
-    mask_debug = False
+    lam = 100.0
 
     # SMALL 1D BLURRING PROBLEM (100 pixels)
     if problem == 0:
@@ -476,25 +474,6 @@ def test(problem=0,method=1, plot=True):
         Kb = sps.eye(m)
         M = util.gen_M_1d(k=p, n=n, sparse=True)
 
-        if mask_debug:
-            _f_ = np.zeros((n_1, n_2))
-            for i in range(n_1):
-                for j in range(n_2):
-                    _f_[i][j] = float(i)
-
-            plt.figure()
-            plt.title('Original image')
-            plt.imshow(_f_)
-
-            _f_ = _f_.reshape(n, )
-            masked = M.dot(_f_).reshape(1, p)
-            plt.figure()
-            plt.title('Masked')
-            plt.imshow(masked)
-            plt.show()
-            raise
-
-
         print(' X shape: ' + str(X.shape))
         print(' f shape: ' + str(f.shape))
         print('sb shape: ' + str(sb.shape))
@@ -505,7 +484,7 @@ def test(problem=0,method=1, plot=True):
         m = 100                 # number of x-rays
         n_1, n_2 = 128, 128     # image dimensions
         n = n_1*n_2             # number of pixels (ROIrecon=full image)
-        p = 4500         # number of pixels in HO ROI
+        p = 2000         # number of pixels in HO ROI
         # Works (min term converges ~> 0) for at least p=4096, but takes
         # forever (took 800.25 sec for p=8096)
 
@@ -565,7 +544,7 @@ def test(problem=0,method=1, plot=True):
         n_2 = 50
         n = n_1*n_2
         m = n        # number of pixels in data space (same as img space)
-        k = 100       # number of pixels in HO ROI
+        k = 500       # number of pixels in HO ROI
 
         # blur parameters
         sigma = 3
@@ -593,7 +572,7 @@ def test(problem=0,method=1, plot=True):
         beta = 0.5
         print('RAAR method chosen; using beta=%.2f' % beta)
         start_time = time.time()
-        uopt, mins, cons, times, _ = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
+        uopt, mins, cons, times, _ = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=0.01, \
             max_iter=10000, full_output=1)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
@@ -606,7 +585,7 @@ def test(problem=0,method=1, plot=True):
             plt.show()
     elif method == 1:
         start_time = time.time()
-        uopt, mins, cons, times, _ = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+        uopt, mins, cons, times, _ = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.01, \
             max_iter=10000, full_output=1)
         t = time.time() - start_time
         print('Took %.2f sec' % t)
@@ -639,13 +618,13 @@ def test(problem=0,method=1, plot=True):
 
         beta = 0.5
         print('RAAR: beta=%.4f\n' % beta)
-        B = sps.eye(n_1*n_2)
+        B = sps.eye(n)
 
-        _, raar_mins, _, raar_times, raars = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=1.0, \
+        uopt, raar_mins, _, raar_times, raars = raar(Kb=Kb, A=X, sb=sb, lam=lam, M=M, beta=beta, tol=0.01, \
             max_iter=200, full_output=1, sl=2.)
-        _, pocs_mins, _, pocs_times, pocss = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+        _, pocs_mins, _, pocs_times, pocss = pocs(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.01, \
             max_iter=200, full_output=1)
-        _, _, _, _, _, dr_mins, dr_times, drs = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=1.0, \
+        _, _, _, _, _, dr_mins, dr_times, drs = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.01, \
             max_iter=200, full_output=1, order=12, sl=1.5)
         minres_A, minres_b = template.gen_ESI_system(X=X, Kb=Kb, B=B, M=M, lam=lam, sb=sb)
         _, _, minres_xs, minres_resids, minres_times = spsla.minres_track(A=minres_A, b=minres_b)
@@ -658,15 +637,16 @@ def test(problem=0,method=1, plot=True):
         raar_errs = [la.norm(M.dot(Z).dot(u)-w_direct) for u in raars]
         pocs_errs = [la.norm(M.dot(Z).dot(u)-w_direct) for u in pocss]
         dr_errs = [la.norm(M.dot(Z).dot(u)-w_direct) for u in drs]
-        print(Z.shape)
-        print(minres_xs[0][0:(n_1*n_2)].shape)
+        #print(Z.shape)
+        #print(minres_xs[0][0:(n_1*n_2)].shape)
 
 
-        minres_errs = [la.norm(M.dot(Z).dot(u[0:(n_1*n_2)])-w_direct) for u in minres_xs]
+        minres_errs = [la.norm(M.dot(Z).dot(u[0:(n)])-w_direct) for u in minres_xs]
 
-        def use_loglog(_list_): return _list_[0] >= 100.0*_list_[-1]
+        def use_loglog(_list_): return any([(li[0] >= 100.0*li[-1]) for li in _list_])
 
-        if use_loglog(raar_mins) or use_loglog(pocs_mins) or use_loglog(dr_mins):
+
+        if use_loglog([raar_mins, pocs_mins, dr_mins, minres_errs]):
             plt.loglog(raar_times, raar_mins, marker='o', markersize=3)
             plt.loglog(pocs_times, pocs_mins, marker='o', markersize=3)
             plt.loglog(dr_times, dr_mins, marker='o', markersize=3)
@@ -677,34 +657,26 @@ def test(problem=0,method=1, plot=True):
             plt.plot(dr_times, dr_mins, marker='o', markersize=3)
             plt.plot(minres_times, minres_resids, marker='o', markersize=3)
 
-
         ## plot residuals
         plt.xlabel('Time at current iteration')
         plt.ylabel('Absolute Residual of Minimization Term')
         plt.legend(['RAAR', 'POCS', 'DR', 'MINRES'])
         plt.show()
 
-        if use_loglog(raar_mins) or use_loglog(pocs_mins) or use_loglog(dr_mins):
-            plt.loglog(raar_times, raar_errs, marker='o', markersize=3)
-            plt.loglog(pocs_times, pocs_errs, marker='o', markersize=3)
-            plt.loglog(dr_times, dr_errs, marker='o', markersize=3)
-            plt.loglog(minres_times, minres_errs, marker='o', markersize=3)
-        else:
-            plt.plot(raar_times, raar_errs, marker='o', markersize=3)
-            plt.plot(pocs_times, pocs_errs, marker='o', markersize=3)
-            plt.plot(dr_times, dr_errs, marker='o', markersize=3)
-            plt.plot(minres_times, minres_errs, marker='o', markersize=3)
-
-
-        ## plot residuals
-        plt.xlabel('Time at current iteration')
-        plt.ylabel('Error of Minimization Term (vs direct solve)')
-        plt.legend(['RAAR', 'POCS', 'DR', 'MINRES'])
-        plt.show()
-
-
     else:
         raise ValueError('Possible methods: 0,1,2,3')
+
+    
+    # TEST IF THE RETURNED SOLUTION IS VALID ============================================
+    #w = M.dot(X.T.dot(X) + lam*sps.eye(X.shape[0])).T.dot(sps.eye(X.shape[0]))).dot(uopt)
+    w = M.dot(X.T.dot(X) + lam*B.T.dot(B)).dot(uopt)
+    R = spsla.inv((X.T.dot(X) + lam*B.T.dot(B))).dot(X.T)
+    Kx = M.dot(R.dot(Kb.dot(R.T.dot(M.T))))
+
+    print('\nERROR: ')
+    print(la.norm(Kx.dot(w) - sx))
+
+    # ===================================================================================
 
     print('\nGHETTO COMMAND LINE \n')
 
@@ -715,7 +687,7 @@ def test(problem=0,method=1, plot=True):
             if inp=='continue':
                 break
             else:
-                exec(inp)
+                exec(inp) in locals()
 
             sys.stdout.flush()
         except KeyboardInterrupt:
@@ -800,27 +772,4 @@ def test_orthogonal(Kb, X, sb, lam, M, B=None, proj=None, x_0=None):
 if __name__ == "__main__":
 
     # test(problem=0, method=2, plot=True)
-    test(problem=4, method=3, plot=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    pass
+    test(problem=1, method=3, plot=True)
