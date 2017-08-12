@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.linalg as la
 import scipy.linalg as sla
+import scipy.sparse.linalg as spsla
 import scipy.sparse as sps
 import matplotlib.pyplot as plt
 import optimize, traceback, sys
@@ -335,24 +336,6 @@ def gen_instance_1d_blur(m=None, n=None, k=None, K_diag=None, sigma=3, t=10, spa
 
     return Kb, X, M
 
-def gen_instance_1d_xray(m=None, n_1=None, n_2=None, k=None, K_diag=None, sparse=True):
-    """
-    Args
-        m: dimension of data space
-        k: dimension of ROI
-        n_1: row of image space (number of 1d pixels)
-        n_2: col of image space (number of 1d pixels)
-    Returns
-        M: a k x n matrix
-    """
-    n = n_1*n_2
-    Kb = gen_Kb(m=m, K_diag=K_diag, sparse=sparse)
-    X = drt.gen_X(n_1=n_1, n_2=n_2, m=m, sp_rep=sparse)
-    M = gen_M_1d(k=k, n=n, sparse=sparse)
-
-    return Kb, X, M
-
-
 def gen_M_2d(ri=None, k=None, n_1=None, n_2=None, sparse=True):
     """
     Generates a mask `M` to extract the middle `k` pixels from image row `ri`
@@ -378,7 +361,7 @@ def gen_M_2d(ri=None, k=None, n_1=None, n_2=None, sparse=True):
         M = sps.csr_matrix(M)
     return M
 
-def gen_instance_2d_blur(m, n_1, n_2, ri=None, k=None, K_diag=None, sigma=None, t=None, sparse=True):
+def gen_instance_2d_blur(m=None, n_1=None, n_2=None, ri=None, k=None, K_diag=None, sigma=None, t=None, sparse=True):
     """
     Args
         m: dimension of data space
@@ -396,11 +379,10 @@ def gen_instance_2d_blur(m, n_1, n_2, ri=None, k=None, K_diag=None, sigma=None, 
     X_col, X_row = blur_2d.fwdblur_operator_2d(n_1=n_1, n_2=n_2, sigma=sigma, t=t, sparse=sparse)
     X = X_col.dot(X_row)
     M = gen_M_2d(ri=ri, k=k, n_1=n_1, n_2=n_2, sparse=sparse)
-    #M = gen_M_1d(k=k, n=n_1*n_2, sparse=sparse)
 
     return Kb, X, M
 
-def gen_instance_2d_xray(m, n_1, n_2, ri=None, k=None, K_diag=None, sparse=True):
+def gen_instance_2d_xray(m=None, n_1=None, n_2=None, ri=None, k=None, K_diag=None, sparse=True):
     """
     Args
         m: dimension of data space
@@ -428,14 +410,17 @@ def scipy_sparse_to_spmatrix(A):
     SP = spmatrix(coo.data.tolist(), coo.row.tolist(), coo.col.tolist(), size=A.shape)
     return SP
 
-def calc_ho(X=None, B=None, lam=None, M=None, u=None):
+def calc_ho(X=None, B=None, lam=None, M=None, u=None, ESI=False):
     m, n = X.shape[0], X.shape[1]
     if B is None: B = sps.eye(n)
 
     ## intermediate matrix
     Z = X.T.dot(X) + lam*B.T.dot(B)
 
-    return M.dot(Z).dot(u)
+    if ESI:
+        return M.dot(Z).dot(u[0:n])
+    else:
+        return M.dot(Z).dot(u)
 
 def direct_rxn(X=None, lam=None, B=None, sparse=True):
     n = X.shape[1]
@@ -451,8 +436,6 @@ def direct_rxn(X=None, lam=None, B=None, sparse=True):
 
 def direct_solve(Kb=None, R=None, M=None, lam=None, B=None, sb=None, sparse=True):
     MR = M.dot(R)
-    print(MR.shape, "MR")
-    print(Kb.shape, "Kb")
     Lx = MR.dot(Kb)
     Kx = Lx.dot(MR.T)
     sx = MR.dot(sb)
@@ -499,8 +482,6 @@ def direct_rxn(X=None, lam=None, B=None, sparse=True):
 
 def direct_solve(Kb=None, R=None, M=None, lam=None, B=None, sb=None, sparse=True):
     MR = M.dot(R)
-    print(MR.shape, "MR")
-    print(Kb.shape, "Kb")
     Lx = MR.dot(Kb)
     Kx = Lx.dot(MR.T)
     sx = MR.dot(sb)
