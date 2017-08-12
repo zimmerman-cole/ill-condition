@@ -6,7 +6,7 @@ import util, optimize, time, traceback, sys
 import tomo2D.drt as drt
 import matplotlib.pyplot as plt
 from tomo2D import blur_2d as blur_2d
-import template
+import util
 
 """
 Projection-based methods:
@@ -419,7 +419,7 @@ def test(problem=0,method=1, plot=True):
 
         print('Generating blur problem w/ params:')
         print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
-        Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
+        Kb, X, M = util.gen_instance_1d_blur(m=m, n=n, k=k, \
                     K_diag=np.ones(m, dtype=np.float64), sigma=3, t=10, \
                     sparse=True)
 
@@ -526,7 +526,7 @@ def test(problem=0,method=1, plot=True):
 
         print('Generating blur problem w/ params:')
         print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
-        Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
+        Kb, X, M = util.gen_instance_1d_blur(m=m, n=n, k=k, \
                     K_diag=np.ones(m, dtype=np.float64), sigma=3, t=10, \
                     sparse=True)
 
@@ -556,7 +556,7 @@ def test(problem=0,method=1, plot=True):
 
         print('Generating blur problem w/ params:')
         print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
-        Kb, X, M = util.gen_instance_2d(m=m, n_1=n_1, n_2=n_2, k=k, sigma=sigma, t=t, \
+        Kb, X, M = util.gen_instance_2d_blur(m=m, n_1=n_1, n_2=n_2, k=k, sigma=sigma, t=t, \
                                         sparse=True, K_diag=np.ones(m, dtype=np.float64))
         sb = X.dot(sx)
 
@@ -626,12 +626,12 @@ def test(problem=0,method=1, plot=True):
             max_iter=200, full_output=1)
         _, _, _, _, _, dr_mins, dr_times, drs = dr(Kb=Kb, A=X, sb=sb, lam=lam, M=M, tol=0.01, \
             max_iter=200, full_output=1, order=12, sl=1.5)
-        minres_A, minres_b = template.gen_ESI_system(X=X, Kb=Kb, B=B, M=M, lam=lam, sb=sb)
+        minres_A, minres_b = util.gen_ESI_system(X=X, Kb=Kb, B=B, M=M, lam=lam, sb=sb)
         _, _, minres_xs, minres_resids, minres_times = spsla.minres_track(A=minres_A, b=minres_b)
 
         ## compute errors
-        R_direct = template.direct_rxn(X=X, lam=lam)
-        w_direct, Kx, sx = template.direct_solve(Kb=Kb, R=R_direct, M=M, sb=sb)
+        R_direct = util.direct_rxn(X=X, lam=lam)
+        w_direct, Kx, sx = util.direct_solve(Kb=Kb, R=R_direct, M=M, sb=sb)
 
         Z = X.T.dot(X) + lam*B.T.dot(B)
         raar_errs = [la.norm(M.dot(Z).dot(u)-w_direct) for u in raars]
@@ -666,7 +666,7 @@ def test(problem=0,method=1, plot=True):
     else:
         raise ValueError('Possible methods: 0,1,2,3')
 
-    
+
     # TEST IF THE RETURNED SOLUTION IS VALID ============================================
     #w = M.dot(X.T.dot(X) + lam*sps.eye(X.shape[0])).T.dot(sps.eye(X.shape[0]))).dot(uopt)
     w = M.dot(X.T.dot(X) + lam*B.T.dot(B)).dot(uopt)
@@ -721,7 +721,7 @@ def test_orthogonal(Kb, X, sb, lam, M, B=None, proj=None, x_0=None):
 
     print('Generating blur problem w/ params:')
     print('m: %d    k/p: %d   sig: %.2f   t: %d\n' % (m, k, sigma, t))
-    Kb, X, M = util.gen_instance_1d(m=m, n=n, k=k, \
+    Kb, X, M = util.gen_instance_1d_blur(m=m, n=n, k=k, \
                 K_diag=np.ones(m, dtype=np.float64), sigma=3, t=10, \
                 sparse=True)
 

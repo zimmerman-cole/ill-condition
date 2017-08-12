@@ -434,7 +434,7 @@ def direct_rxn(X=None, lam=None, B=None, sparse=True):
         R = la.solve(A, X.T)
     return R
 
-def direct_solve(Kb=None, R=None, M=None, lam=None, B=None, sb=None, sparse=True):
+def direct_solve(Kb=None, R=None, M=None, B=None, sb=None, sparse=True):
     MR = M.dot(R)
     Lx = MR.dot(Kb)
     Kx = Lx.dot(MR.T)
