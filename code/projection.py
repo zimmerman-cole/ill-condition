@@ -6,7 +6,7 @@ import util, optimize, time, traceback, sys
 import tomo2D.drt as drt
 import matplotlib.pyplot as plt
 from tomo2D import blur_2d as blur_2d
-import util
+from decimal import Decimal
 
 """
 Projection-based methods:
@@ -18,7 +18,7 @@ These methods are made SPECIFICALLY to solve this one system; they are NOT
 general implementations.
 """
 
-def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=None, verbose=False):
+def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=None, verbose=False, R=None):
     """
     Projection onto Convex Sets.
 
@@ -82,6 +82,9 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=
     constr_resids = []
     us = []
     if full_output:
+        if R is None:
+            print('full_output requires R')
+            sys.exit(0)
         hot_resids = []    # hotelling template check
 
     try:
@@ -116,7 +119,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=
         if full_output:
             for uu in us:
                 w = util.calc_hot(X=A, B=B, lam=lam, M=M, u=uu)
-                hot_resids.append( la.norm(M.dot(A).dot(Kb).dot(A.T).dot(M.T).dot(w) - M.dot(A).dot(sb)) )
+                hot_resids.append( la.norm(M.dot(R).dot(Kb).dot(R.T).dot(M.T).dot(w) - M.dot(R).dot(sb)) )
 
             #raw_input()
     except KeyboardInterrupt:
@@ -127,7 +130,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=
     else:
         return u
 
-def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None, sl=None, verbose=False):
+def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None, sl=None, verbose=False, R=None):
     """
     Douglas-Rachford.
 
@@ -194,6 +197,10 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
     if full_output:
         hot_resids = []
+        if R is None:
+            print('full_output requires R')
+            sys.exit(0)
+
 
     times = []
 
@@ -279,7 +286,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     if full_output:
         for uu in us:
             w = util.calc_hot(X=A, B=B, lam=lam, M=M, u=uu)
-            hot_resids.append( la.norm(M.dot(A).dot(Kb).dot(A.T).dot(M.T).dot(w) - M.dot(A).dot(sb)) )
+            hot_resids.append( la.norm(M.dot(R).dot(Kb).dot(R.T).dot(M.T).dot(w) - M.dot(R).dot(sb)) )
 
     if full_output:
         l = len(times)
@@ -287,7 +294,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     else:
         return w_0
 
-def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0, sl=None, verbose=False):
+def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0, sl=None, verbose=False, R=None):
 
     """
     Relaxed Averaged Alternating Reflections.
@@ -352,9 +359,10 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     _con_resids_ = []
     us = []
     if full_output:
+        if R is None:
+            print('full_output requires R')
+            sys.exit(0)
         hot_resids = []
-        hot_errs = []
-        proj_errs = []
 
     try:
         for i in range(max_iter):
@@ -417,7 +425,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     if full_output:
         for uu in us:
             w = util.calc_hot(X=A, B=B, lam=lam, M=M, u=uu)
-            hot_resids.append( la.norm(M.dot(A).dot(Kb).dot(A.T).dot(M.T).dot(w) - M.dot(A).dot(sb)) )
+            hot_resids.append( la.norm(M.dot(R).dot(Kb).dot(R.T).dot(M.T).dot(w) - M.dot(R).dot(sb)) )
 
     # print('============================================')
     # print('FINAL min err: %.2f' % min_resid)
@@ -452,7 +460,7 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
     if method == 'raar':
         ## compute resids
         u, min_resids, con_resids, times, us, hot_resids = raar(
-            Kb, X, sb, lam, M, beta, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None
+            Kb, X, sb, lam, M, beta, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None, R=R_direct
         )
         ## compute hot errs
         Z = X.T.dot(X) + lam*B.T.dot(B)
@@ -460,7 +468,7 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
     elif method == 'dr':
         ## compute resids
         u, min_resids, con_resids, _, times, us, hot_resids = dr(
-            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None
+            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None, R=R_direct
         )
         ## compute hot errs
         Z = X.T.dot(X) + lam*B.T.dot(B)
@@ -468,7 +476,7 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
     elif method == 'pocs':
         ## compute resids
         u, min_resids, con_resids, times, us, hot_resids = pocs(
-            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1
+            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, R=R_direct
         )
         ## compute hot errs
         Z = X.T.dot(X) + lam*B.T.dot(B)
@@ -480,27 +488,27 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
         hot_resids = []
         for uu in us:
             w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
-            hot_resids.append( la.norm(M.dot(X).dot(Kb).dot(X.T).dot(M.T).dot(w) - M.dot(X).dot(sb)) )
+            hot_resids.append( la.norm(M.dot(R_direct).dot(Kb).dot(R_direct.T).dot(M.T).dot(w) - M.dot(R_direct).dot(sb)) )
         ## compute hot errs
         Z = X.T.dot(X) + lam*B.T.dot(B)
         hot_errs = [la.norm(M.dot(Z).dot(uu[0:n])-w_direct) for uu in us]
     elif method == 'all':
         ## compute resids
         u_r, min_resids_r, con_resids_r, times_r, us_r, hot_resids_r = raar(
-            Kb, X, sb, lam, M, beta, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None
+            Kb, X, sb, lam, M, beta, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None, R=R_direct
         )
         u_d, min_resids_d, con_resids_d, _, times_d, us_d, hot_resids_d = dr(
-            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None
+            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None, R=R_direct
         )
         u_p, min_resids_p, con_resids_p, times_p, us_p, hot_resids_p = pocs(
-            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1
+            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, R=R_direct
         )
         u_m, _, us_m, min_resids_m, times_m = spsla.minres_track(A=minres_A, b=minres_b)
         ## compute minres hot resids
         hot_resids_m = []
         for uu in us_m:
             w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
-            hot_resids_m.append( la.norm(M.dot(X).dot(Kb).dot(X.T).dot(M.T).dot(w) - M.dot(X).dot(sb)) )
+            hot_resids_m.append( la.norm(M.dot(R_direct).dot(Kb).dot(R_direct.T).dot(M.T).dot(w) - M.dot(R_direct).dot(sb)) )
         ## compute hot errs
         Z = X.T.dot(X) + lam*B.T.dot(B)
         hot_errs_r = [w_direct - M.dot(Z).dot(uu) for uu in us_r]
@@ -518,7 +526,7 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
     ## plot
     if method == 'all':
         print("===== method = %s ===================================" % method)
-        print("          lam: %s" % lam)
+        print("          lam: %s" % '%.2E' % Decimal(str(lam)))
         print("            k: %s" % k)
         print("    max iters: %s" % max_iter)
         print("    tolerance: %s" % tol)
@@ -543,7 +551,7 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
         plt.show()
     elif method != 'all' and method != 'minres':
         print("===== method = %s ===================================" % method)
-        print("          lam: %s" % lam)
+        print("          lam: %s" % '%.2E' % Decimal(str(lam)))
         print("            k: %s" % k)
         print("    max iters: %s" % max_iter)
         print("    tolerance: %s" % tol)
@@ -559,7 +567,7 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
         plt.show()
     elif method == 'minres':
         print("===== method = %s ===================================" % method)
-        print("          lam: %s" % lam)
+        print("          lam: %s" % '%.2E' % Decimal(str(lam)))
         print("            k: %s" % k)
         print("    max iters: %s" % max_iter)
         print("    tolerance: %s" % tol)
