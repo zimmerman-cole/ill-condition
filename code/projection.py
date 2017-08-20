@@ -18,7 +18,7 @@ These methods are made SPECIFICALLY to solve this one system; they are NOT
 general implementations.
 """
 
-def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
+def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=None, verbose=False):
     """
     Projection onto Convex Sets.
 
@@ -78,46 +78,56 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0):
 
     start_time = time.time()
     times = []
-    min_errors = []
-    constr_errors = []
+    min_resids = []
+    constr_resids = []
     us = []
+    if full_output:
+        hot_resids = []    # hotelling template check
 
     try:
         for i in range(max_iter):
-            print('=== POCS Iter %d =============' % i)
+            if verbose:
+                print('=== POCS Iter %d =============' % i)
 
             # === Solve minimization problem ================================
             u = min_solver.solve(x_0=u)
             Au = np.array(min_solver.A.dot(u)).reshape(n, )
-            min_err = la.norm(Au - min_solver.b)
-            constr_err = la.norm(Au - constr_solver.b)
+            min_resid = la.norm(Au - min_solver.b)
+            constr_resid = la.norm(Au - constr_solver.b)
 
             # === Solve constraint problem ==================================
             u = constr_solver.solve(x_0=u)
             times.append(time.time() - start_time)
-            min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
-            constr_err = la.norm(constr_solver.A.dot(u) - constr_solver.b)
+            min_resid = la.norm(min_solver.A.dot(u) - min_solver.b)
+            constr_resid = la.norm(constr_solver.A.dot(u) - constr_solver.b)
 
-            #print('min err: %.2f' % min_err)
-            #print('constr err: %.2f' % constr_err)
+            #print('min err: %.2f' % min_resid)
+            #print('constr err: %.2f' % constr_resid)
             us.append(u)
 
-            min_errors.append(min_err)
-            constr_errors.append(constr_err)
+            min_resids.append(min_resid)
+            constr_resids.append(constr_resid)
 
-            if min_err <= tol:
+            if min_resid <= tol:
+                print('min_resid break')
                 break
+
+        ## check eq outside of timed loop
+        if full_output:
+            for uu in us:
+                w = util.calc_hot(X=A, B=B, lam=lam, M=M, u=uu)
+                hot_resids.append( la.norm(M.dot(A).dot(Kb).dot(A.T).dot(M.T).dot(w) - M.dot(A).dot(sb)) )
 
             #raw_input()
     except KeyboardInterrupt:
         pass    # so you can interrupt and still return the residuals so far
 
     if full_output:
-        return u, min_errors, constr_errors, times, us
+        return u, min_resids, constr_resids, times, us, hot_resids
     else:
         return u
 
-def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None, sl=None):
+def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order=None, sl=None, verbose=False):
     """
     Douglas-Rachford.
 
@@ -162,6 +172,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     if B is None: B = iden(n)
     # sl default: reflection
     if sl is None: sl = 2.
+    if order is None: order = 21
 
     ## operator - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     # A.T Kb A u = A.T sb
@@ -174,12 +185,15 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
         b = np.zeros(n), full_output = 0
     )
 
-    min_errors = []         #
-    constr_errors = []      #
-    dr_min_errors = []      # dr min obj errors (before projection onto constraint)
-    dr_constr_errors = []   # dr constraint errors (before projection onto constraint)
+    min_resids = []         #
+    constr_resids = []      #
+    dr_min_resids = []      # dr min obj resids (before projection onto constraint)
+    dr_constr_resids = []   # dr constraint resids (before projection onto constraint)
     proj_errors = []        # min errors after dr step projected onto constraint
     us = []
+
+    if full_output:
+        hot_resids = []
 
     times = []
 
@@ -188,80 +202,92 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
     try:
         for i in range(max_iter):
-            print('=== DR Iter %d =============' % i)
+            if verbose:
+                print('=== DR Iter %d =============' % i)
 
             if order == 12:
                 ## compute T_{1,2} - - - - - - - - - - - - - - - - - - - - - - - - - - -
                 ## first projection
                 dd = constr_solver.solve(x_0=u_0)-u_0
                 u_1 = u_0 + sl*dd
-                constr_errors.append(la.norm(constr_solver.A.dot(u_1) - constr_solver.b))
+                constr_resids.append(la.norm(constr_solver.A.dot(u_1) - constr_solver.b))
 
                 ## second projection
                 v_0 = u_1
                 d = min_solver.solve(x_0=v_0)-v_0
                 v_1 = v_0 + sl*d
-                min_errors.append(la.norm(min_solver.A.dot(v_1) - min_solver.b))
+                min_resids.append(la.norm(min_solver.A.dot(v_1) - min_solver.b))
 
                 ## average double projection with original position
                 w_0 = 0.5*(u_0 + v_1)
-                dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
-                dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
+                if verbose:
+                    dr_min_resids.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+                    dr_constr_resids.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
 
                 ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
                 w_1 = constr_solver.solve(x_0=w_0)
                 proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
 
                 ## update
-                u_0 = w_0
+                u_0 = np.copy(w_0)
                 us.append(u_0)
 
                 if proj_errors[-1] <= tol:
+                    print('min_resid break')
                     break
+
             elif order == 21:
                 ## compute T_{2,1} - - - - - - - - - - - - - - - - - - - - - - - - - - -
                 ## first projection
                 dd = min_solver.solve(x_0=u_0)-u_0
                 u_1 = u_0 + sl*dd
-                min_errors.append(la.norm(min_solver.A.dot(u_1) - min_solver.b))
+                min_resids.append(la.norm(min_solver.A.dot(u_1) - min_solver.b))
 
                 ## second projection
                 v_0 = u_1
                 d = constr_solver.solve(x_0=v_0)-v_0
                 v_1 = v_0 + sl*d
-                constr_errors.append(la.norm(constr_solver.A.dot(v_1) - constr_solver.b))
+                constr_resids.append(la.norm(constr_solver.A.dot(v_1) - constr_solver.b))
 
                 ## average double projection with original position
                 w_0 = 0.5*(u_0 + v_1)
-                dr_constr_errors.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
-                dr_min_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+                if verbose:
+                    dr_constr_resids.append(la.norm(constr_solver.A.dot(w_0) - constr_solver.b))
+                    dr_min_resids.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
 
                 ## project onto constraint - - - - - - - - - - - - - - - - - - - - - - -
                 w_1 = constr_solver.solve(x_0=w_0)
                 proj_errors.append(la.norm(min_solver.A.dot(w_1) - min_solver.b))
 
                 ## update
-                u_0 = w_0
+                u_0 = np.copy(w_0)
                 us.append(u_0)
 
                 if proj_errors[-1] <= tol:
                     break
             times.append(time.time()-t_0)
+        ## final project onto constraint - - - - - - - - - - - - - - - - - - - - - -
+        w = constr_solver.solve(x_0=w_0)
+        us.append(w)
+        proj_errors.append(la.norm(min_solver.A.dot(w) - min_solver.b))
+
     except KeyboardInterrupt:
         pass # so you can interrupt algorithm and still plot residuals so far
 
-    ## final project onto constraint - - - - - - - - - - - - - - - - - - - - - -
-    w_0 = constr_solver.solve(x_0=w_0)
-    us.append(w_0)
-    proj_errors.append(la.norm(min_solver.A.dot(w_0) - min_solver.b))
+
+    ## check eq outside of timed loop
+    if full_output:
+        for uu in us:
+            w = util.calc_hot(X=A, B=B, lam=lam, M=M, u=uu)
+            hot_resids.append( la.norm(M.dot(A).dot(Kb).dot(A.T).dot(M.T).dot(w) - M.dot(A).dot(sb)) )
 
     if full_output:
         l = len(times)
-        return w_0[1:(l+1)], min_errors[0:l], constr_errors[0:l], dr_min_errors[0:l], dr_constr_errors[0:l], proj_errors[0:l], times, us[0:l]
+        return w_0[1:(l+1)], min_resids[0:l], constr_resids[0:l], proj_errors[0:l], times, us[0:l], hot_resids
     else:
         return w_0
 
-def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0, sl=None):
+def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=0, sl=None, verbose=False):
 
     """
     Relaxed Averaged Alternating Reflections.
@@ -322,13 +348,18 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
 
     start_time = time.time()
     times = []
-    _min_errs_ = []
-    _con_errs_ = []
+    _min_resids_ = []
+    _con_resids_ = []
     us = []
+    if full_output:
+        hot_resids = []
+        hot_errs = []
+        proj_errs = []
 
     try:
         for i in range(max_iter):
-            print('=== RAAR Iter %d =============' % i)
+            if verbose:
+                print('=== RAAR Iter %d =============' % i)
 
             # Calculate R_1 u ======================================================
             P1_u = min_solver.solve(x_0=np.copy(u))     # u projected onto P1
@@ -345,46 +376,209 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
             # Now use this to calculate RAAR-operated u ============================
             Vb_u = beta*T21_u + (1.0-beta)*P1_u
 
-            # Now project onto P2 (ensure constraint is completely satisfied) ======
+            # Now project onto P2 (to test error)
             p2_proj = constr_solver.solve(x_0 = Vb_u)
 
             # Check errors/termination condition ===================================
             times.append(time.time() - start_time)
-            min_err = la.norm(min_solver.A.dot(p2_proj) - min_solver.b)
-            constr_err = la.norm(constr_solver.A.dot(p2_proj) - constr_solver.b)
-            # print('min err: %f' % min_err)
-            # print('constr err: %f' % constr_err)
+            min_resid = la.norm(min_solver.A.dot(Vb_u) - min_solver.b)
+            constr_resid = la.norm(constr_solver.A.dot(Vb_u) - constr_solver.b)
+            # print('min err: %f' % min_resid)
+            # print('constr err: %f' % constr_resids)
 
-            _min_errs_.append(min_err)
-            _con_errs_.append(constr_err)
+            _min_resids_.append(min_resid)
+            _con_resids_.append(constr_resid)
 
             ## update u with RAAR step
             u = Vb_u
             us.append(u)
 
+            ## test residuals on projecting Vb_u to P2
+            resid_test = la.norm(min_solver.A.dot(p2_proj) - min_solver.b)
+            # proj_errs.append(resid_test)
+
             # P2 error=0 and P1 error <= tolerance
-            if min_err <= tol:  # constr_err <= 10**-6 and
+            if resid_test <= tol:  # constr_resids <= 10**-6 and
+                print('resid_test break')
                 break
 
         ## project onto constraint at the end
         u = constr_solver.solve(x_0 = u)
         us.append(u)
-        min_err = la.norm(min_solver.A.dot(u) - min_solver.b)
+        min_resid = la.norm(min_solver.A.dot(u) - min_solver.b)
         times.append(time.time() - start_time)
-        _min_errs_.append(min_err)
+        _min_resids_.append(min_resid)
 
     except KeyboardInterrupt:
         pass    # So you can interrupt the method and still plot the residuals so far
 
 
+    ## check eq outside of timed loop
+    if full_output:
+        for uu in us:
+            w = util.calc_hot(X=A, B=B, lam=lam, M=M, u=uu)
+            hot_resids.append( la.norm(M.dot(A).dot(Kb).dot(A.T).dot(M.T).dot(w) - M.dot(A).dot(sb)) )
+
     # print('============================================')
-    # print('FINAL min err: %.2f' % min_err)
-    # print('FINALconstr err: %.2f' % constr_err)
+    # print('FINAL min err: %.2f' % min_resid)
+    # print('FINALconstr err: %.2f' % constr_resids)
 
     if full_output:
-        return u, _min_errs_, _con_errs_, times, us
+        return u, _min_resids_, _con_resids_, times, us, hot_resids
     else:
         return u
+
+def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
+    """
+    Inputs:     prob    -  problem instance from `problems.py`
+                        -  set `ESI=True` and `dir_soln=True`
+                method  -  raar, dr, pocs, minres, all
+                sl      -  step length
+
+    Returns:    full output
+    """
+    ## additional args
+    beta = kwargs.setdefault('beta',0.5)
+    sl = kwargs.setdefault('sl',2)
+    tol = kwargs.setdefault('tol',1e-5)
+    max_iter = kwargs.setdefault('max_iter',int(500))
+
+    ## rename
+    B, lam, k, X, Kb, M, R_direct, sb, w_direct = prob.B, prob.lam, prob.k, prob.X, prob.Kb, prob.M, prob.R_direct, prob.sb, prob.w_direct
+    minres_A, minres_b = prob.ESI_A, prob.ESI_b
+    n = X.shape[1]
+
+    ## compute resids and errs
+    if method == 'raar':
+        ## compute resids
+        u, min_resids, con_resids, times, us, hot_resids = raar(
+            Kb, X, sb, lam, M, beta, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None
+        )
+        ## compute hot errs
+        Z = X.T.dot(X) + lam*B.T.dot(B)
+        hot_errs = [la.norm(M.dot(Z).dot(uu)-w_direct) for uu in us]
+    elif method == 'dr':
+        ## compute resids
+        u, min_resids, con_resids, _, times, us, hot_resids = dr(
+            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None
+        )
+        ## compute hot errs
+        Z = X.T.dot(X) + lam*B.T.dot(B)
+        hot_errs = [la.norm(M.dot(Z).dot(uu)-w_direct) for uu in us]
+    elif method == 'pocs':
+        ## compute resids
+        u, min_resids, con_resids, times, us, hot_resids = pocs(
+            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1
+        )
+        ## compute hot errs
+        Z = X.T.dot(X) + lam*B.T.dot(B)
+        hot_errs = [la.norm(M.dot(Z).dot(uu)-w_direct) for uu in us]
+    elif method == 'minres':
+        ## compute resids
+        _, _, us, min_resids, times = spsla.minres_track(A=minres_A, b=minres_b)
+        ## compute hot resids
+        hot_resids = []
+        for uu in us:
+            w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
+            hot_resids.append( la.norm(M.dot(X).dot(Kb).dot(X.T).dot(M.T).dot(w) - M.dot(X).dot(sb)) )
+        ## compute hot errs
+        Z = X.T.dot(X) + lam*B.T.dot(B)
+        hot_errs = [la.norm(M.dot(Z).dot(uu[0:n])-w_direct) for uu in us]
+    elif method == 'all':
+        ## compute resids
+        u_r, min_resids_r, con_resids_r, times_r, us_r, hot_resids_r = raar(
+            Kb, X, sb, lam, M, beta, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None
+        )
+        u_d, min_resids_d, con_resids_d, _, times_d, us_d, hot_resids_d = dr(
+            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, sl=None
+        )
+        u_p, min_resids_p, con_resids_p, times_p, us_p, hot_resids_p = pocs(
+            Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1
+        )
+        u_m, _, us_m, min_resids_m, times_m = spsla.minres_track(A=minres_A, b=minres_b)
+        ## compute minres hot resids
+        hot_resids_m = []
+        for uu in us_m:
+            w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
+            hot_resids_m.append( la.norm(M.dot(X).dot(Kb).dot(X.T).dot(M.T).dot(w) - M.dot(X).dot(sb)) )
+        ## compute hot errs
+        Z = X.T.dot(X) + lam*B.T.dot(B)
+        hot_errs_r = [w_direct - M.dot(Z).dot(uu) for uu in us_r]
+        hot_errs_d = [w_direct - M.dot(Z).dot(uu) for uu in us_d]
+        hot_errs_p = [w_direct - M.dot(Z).dot(uu) for uu in us_p]
+        hot_errs_m = [w_direct - M.dot(Z).dot(uu[0:n]) for uu in us_m]
+
+        min_resids_a = [min_resids_r, min_resids_d, min_resids_p, min_resids_m]
+        con_resids_a = [con_resids_r, con_resids_d, con_resids_p]
+        hot_resids_a = [hot_resids_r, hot_resids_d, hot_resids_p, hot_resids_m]
+        hot_errs_a   = [hot_errs_r, hot_errs_d, hot_errs_p, hot_errs_m]
+    else:
+        print('method = `raar`, `dr`, `pocs`, or `all`')
+
+    ## plot
+    if method == 'all':
+        print("===== method = %s ===================================" % method)
+        print("          lam: %s" % lam)
+        print("            k: %s" % k)
+        print("    max iters: %s" % max_iter)
+        print("    tolerance: %s" % tol)
+        print("     step len: %s" % sl)
+        print("     beta: %s" % beta)
+        alg = ['RAAR', 'DR', 'POCS', 'MINRES']
+        leg = []
+        for i in range(3):
+            plt.loglog(min_resids_a[i], marker='o', markersize=10)
+            plt.loglog(con_resids_a[i], marker='o', markersize=10)
+            plt.loglog(hot_resids_a[i], marker='o', markersize=6)
+            plt.loglog(hot_errs_a[i], marker='o', markersize=6)
+            leg += ['Min Resids '+alg[i], 'Con Resids '+alg[i], 'Hotelling Resids '+alg[i], 'Hotelling Errs '+alg[i]]
+            plt.xlabel('Iteration')
+            plt.ylabel('Resid & Err')
+        i = 3
+        plt.loglog(min_resids_a[i], marker='o', markersize=10)
+        plt.loglog(hot_resids_a[i], marker='o', markersize=6)
+        plt.loglog(hot_errs_a[i], marker='o', markersize=6)
+        leg += ['Min Resids '+alg[i], 'Hotelling Resids '+alg[i], 'Hotelling Errs '+alg[i]]
+        plt.legend(leg)
+        plt.show()
+    elif method != 'all' and method != 'minres':
+        print("===== method = %s ===================================" % method)
+        print("          lam: %s" % lam)
+        print("            k: %s" % k)
+        print("    max iters: %s" % max_iter)
+        print("    tolerance: %s" % tol)
+        print("     step len: %s" % sl)
+        print("     beta: %s" % beta)
+        plt.loglog(min_resids, marker='o', markersize=10)
+        plt.loglog(con_resids, marker='o', markersize=10)
+        plt.loglog(hot_resids, marker='o', markersize=6)
+        plt.loglog(hot_errs, marker='o', markersize=6)
+        plt.legend(['Min Resids', 'Con Resids', 'Hotelling Resids', 'Hotelling Errs'])
+        plt.xlabel('Iteration')
+        plt.ylabel('Resid & Err')
+        plt.show()
+    elif method == 'minres':
+        print("===== method = %s ===================================" % method)
+        print("          lam: %s" % lam)
+        print("            k: %s" % k)
+        print("    max iters: %s" % max_iter)
+        print("    tolerance: %s" % tol)
+        print("     step len: %s" % sl)
+        print("     beta: %s" % beta)
+        plt.loglog(min_resids, marker='o', markersize=10)
+        plt.loglog(hot_resids, marker='o', markersize=6)
+        plt.loglog(hot_errs, marker='o', markersize=6)
+        plt.legend(['Min Resids', 'Hotelling Resids', 'Hotelling Errs'])
+        plt.xlabel('Iteration')
+        plt.ylabel('Resid & Err')
+        plt.show()
+    else:
+        print('method = `raar`, `dr`, `pocs`, or `all`')
+
+
+
+
+
 
 def test(problem=0,method=1, plot=True):
     """

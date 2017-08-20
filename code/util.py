@@ -410,7 +410,7 @@ def scipy_sparse_to_spmatrix(A):
     SP = spmatrix(coo.data.tolist(), coo.row.tolist(), coo.col.tolist(), size=A.shape)
     return SP
 
-def calc_ho(X=None, B=None, lam=None, M=None, u=None, ESI=False):
+def calc_hot(X=None, B=None, lam=None, M=None, u=None, ESI=False):
     m, n = X.shape[0], X.shape[1]
     if B is None: B = sps.eye(n)
 

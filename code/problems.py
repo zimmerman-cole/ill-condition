@@ -5,7 +5,7 @@ import scipy.sparse.linalg as spsla
 import matplotlib.pyplot as plt
 import time, traceback, sys
 
-import util, optimize, template
+import util, optimize
 import tomo1D.blur_1d as blur_1d
 import tomo2D.blur_2d as blur_2d
 import tomo2D.drt as drt
@@ -86,7 +86,7 @@ class Problem:
             sys.exit(0)
         l3 = 'lam           = ' + str(self.lam) +'\n'
         l4 = 'B             = ' + str(type(self.B)) +'\n'
-        l5 =  'ROI pixels    = ' + str(self.k) +'\n'
+        l5 = 'ROI pixels    = ' + str(self.k) +'\n'
         l6 = 'ROI row       = ' + str(self.r) +'\n'
 
         return l0+l1+l2+l3+l4+l5+l6
@@ -101,8 +101,8 @@ class Problem:
             self.t = kwargs['t']
             self.sparse = kwargs['sparse']
         else:
-            print('must specify `K_diag`, `sigma`, `t`, and `sparse`')
-            sys.exit(0)
+            print('must specify all of `K_diag`, `sigma`, `t`, and `sparse`')
+            raise
 
     def _set_image(self, **kwargs):
         ## generate image f ----------------------------------------------------
@@ -167,7 +167,7 @@ class Problem:
             sys.exit(0)
 
         ## generate B regularization if empty ----------------------------------
-        if self.B is None: B = sps.eye(self.n)
+        if self.B is None: self.B = sps.eye(self.n)
 
     def _set_systems(self, **kwargs):
         ## generate equivalent symmetric system (ESI) --------------------------
