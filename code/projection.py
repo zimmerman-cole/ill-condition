@@ -92,8 +92,8 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=
     ## errors from all zeros
     constr_resid = la.norm(constr_solver.A.dot(u) - constr_solver.b)
     min_resid = la.norm(min_solver.A.dot(u) - min_solver.b)
-    # print(constr_resid,"pocs constr")
-    # print(min_resid,"pocs resid")
+    print(constr_resid,"pocs constr 0")
+    print(min_resid,"pocs resid 0")
     min_resids.append(min_resid)
     constr_resids.append(constr_resid)
 
@@ -221,8 +221,8 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     ## errors from all zeros
     constr_resid = la.norm(constr_solver.A.dot(u_0) - constr_solver.b)
     min_resid = la.norm(min_solver.A.dot(u_0) - min_solver.b)
-    # print(constr_resid,"dr constr")
-    # print(min_resid,"dr min")
+    print(constr_resid,"dr constr 0")
+    print(min_resid,"dr min 0")
     min_resids.append(min_resid)
     constr_resids.append(constr_resid)
 
@@ -392,8 +392,8 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     ## error from all zeros
     constr_resid = la.norm(constr_solver.A.dot(u) - constr_solver.b)
     min_resid = la.norm(min_solver.A.dot(u) - min_solver.b)
-    # print(constr_resid,"raar constr")
-    # print(min_resid,"raar resid")
+    print(constr_resid,"raar constr 0")
+    print(min_resid,"raar resid 0")
     _min_resids_.append(min_resid)
     _con_resids_.append(constr_resid)
 
@@ -581,6 +581,12 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
             plt.loglog(con_resids_all[i], marker='o', markersize=10)
             plt.loglog(hot_resids_all[i], marker='o', markersize=6)
             plt.loglog(hot_errs_all[i], marker='o', markersize=6)
+            ysi = [min_resids_all[i], con_resids_all[i], hot_resids_all[i], hot_errs_all[i]]
+            xsi = [range(len(min_resids_all[i])), range(len(con_resids_all[i])), range(len(hot_resids_all[i])), range(len(hot_errs_all[i]))]
+            for j in range(len(ysi)):
+                for k in range(1):
+                    plt.annotate('{:06.2f}'.format(Decimal(str(ysi[j][k]))), xy=(xsi[j][k], ysi[j][k]),
+                        xytext=(-5, 5), ha='right', textcoords='offset points')
             plt.legend(['Min Resids '+alg[i], 'Con Resids '+alg[i], 'Hotelling Resids '+alg[i], 'Hotelling Errs '+alg[i]])
             plt.title(alg[i])
             plt.xlabel('Iteration')
@@ -592,7 +598,11 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
         plt.loglog(np.nan, marker='o', markersize=10)
         plt.loglog(hot_resids_all[i], marker='o', markersize=6)
         plt.loglog(hot_errs_all[i], marker='o', markersize=6)
-        plt.legend(['Min Resids '+alg[i], 'Hotelling Resids '+alg[i], 'Hotelling Errs '+alg[i]])
+        for j in range(len(ysi)):
+            for k in range(1):
+                plt.annotate('{:06.2f}'.format(Decimal(str(ysi[j][k]))), xy=(xsi[j][k], ysi[j][k]),
+                    xytext=(-5, 5), ha='right', textcoords='offset points')
+        plt.legend(['Min Resids '+alg[i], 'Con Resids '+alg[i], 'Hotelling Resids '+alg[i], 'Hotelling Errs '+alg[i]])
         plt.title(alg[i])
         plt.xlabel('Iteration')
         plt.ylabel('Resid & Err')
