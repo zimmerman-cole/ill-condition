@@ -29,13 +29,14 @@ class Problem:
         - B        :    regularization matrix
         - ESI      :    True = generates equiv symm indef representation
         - ESIN     :    True = generates equiv symm indef NORMAL eqn representation
+        - ESI3     :    True = generates expanded ESI 3x3 system per Sean's notes
         - dir_soln :    True = generates direct inverse Hotelling template
     """
 
     def __init__(   self, prob=None, dim=None, \
                     n_1=None, n_2=None, m=None, \
                     k=None, r=None, lam=None, B=None, \
-                    ESI=True, ESIN=True, \
+                    ESI=True, ESIN=True, ESI3=True, \
                     dir_soln=True,
                     **kwargs
                 ):
@@ -44,7 +45,7 @@ class Problem:
         self.n_1, self.n_2, self.m = n_1, n_2, m
         self.k, self.r = k, r
         self.lam, self.B = lam, B
-        self.ESI, self.ESIN = ESI, ESIN
+        self.ESI, self.ESIN, self.ESI3 = ESI, ESIN, ESI3
         self.dir_soln = dir_soln
 
         if self.n_2 is not None:
@@ -185,6 +186,11 @@ class Problem:
                                                                 M=self.M, lam=self.lam, sb=self.sb  )
             self.ESIN_A = self.ESI_A.T.dot(self.ESI_A)
             self.ESIN_b = self.ESI_A.T.dot(self.ESI_b)
+
+        ## generate ESI3 equations ---------------------------------------------
+        if self.ESI3:
+            self.ESI3_A, self.ESI3_b = util.gen_ESI_system(   X=self.X, Kb=self.Kb, B=self.B, \
+                                                            M=self.M, lam=self.lam, sb=self.sb  )
 
     def _set_direct(self, **kwargs):
         ## generate direct solve Hotelling Template (small problems) -----------

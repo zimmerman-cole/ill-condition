@@ -459,12 +459,45 @@ def gen_ESI_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None):
     A11 = X.T.dot(Kb).dot(X)
     A12 = Z.dot(sps.eye(n) - M.T.dot(M))
     A21 = A12.T
-    A22 = np.zeros([n,n])
+    # A22 = np.zeros([n,n])
     A = sps.bmat([[A11,A12], [A21,None]])
 
     ## block RHS
     b1 = X.T.dot(sb)
     b = np.concatenate([b1.reshape(n,), np.zeros(n).reshape(n,)])
+
+    return A, b
+
+def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=True):
+    """
+    Generates "Equivalent Symmetric Indefinite" LHS and RHS based on III
+    """
+    m, n = X.shape[0], X.shape[1]
+    if B is None: B = sps.eye(n)
+
+    ## intermediate calc
+    Z = (X.T.dot(X) + lam*B.T.dot(B))
+    C = Z.dot(sps.eye(n) - M.T.dot(M))
+    if sparse:
+        Q = spsla.splu(Kb).dot(A)
+    else:
+        Q = la.cholesky(Kb).dot(A)
+
+    ## block LHS
+    A11 = None
+    A12 = Q.T
+    A13 = C.T
+    A21 = Q
+    A22 = -sps.eye(n)
+    A23 = None
+    A31 = C
+    A32 = None
+    A33 = None
+    A = sps.bmat([[A11,A12,A13], [A21,A22,A23], [A31,A32,A33]])
+
+    ## block RHS
+    b1 = X.T.dot(sb)
+    b = np.concatenate([np.zeros(n).reshape(n,), b1.reshape(n,), np.zeros(n).reshape(n,)])
 
     return A, b
 

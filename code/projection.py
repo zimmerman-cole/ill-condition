@@ -93,8 +93,10 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=
     ## errors from all zeros
     constr_resid = la.norm(constr_solver.A.dot(u) - constr_solver.b)
     min_resid = la.norm(min_solver.A.dot(u) - min_solver.b)
+    print('----- POCS -----------------------')
     print(constr_resid,"pocs constr 0")
     print(min_resid,"pocs resid 0")
+    print('----- POCS -----------------------')
     min_resids.append(min_resid)
     constr_resids.append(constr_resid)
 
@@ -138,7 +140,7 @@ def pocs(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, sl=
 
     if full_output:
         tt = time.time()-t0
-        print('runtime: %s' % round(tt,3))
+        print('    pocs runtime: %s' % round(tt,3))
         return u, min_resids, constr_resids, times, us, hot_resids, tt
     else:
         return u
@@ -225,8 +227,10 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
     ## errors from all zeros
     constr_resid = la.norm(constr_solver.A.dot(u_0) - constr_solver.b)
     min_resid = la.norm(min_solver.A.dot(u_0) - min_solver.b)
+    print('----- DR -------------------------')
     print(constr_resid,"dr constr 0")
     print(min_resid,"dr min 0")
+    print('----- DR -------------------------')
     min_resids.append(min_resid)
     constr_resids.append(constr_resid)
 
@@ -316,7 +320,7 @@ def dr(Kb, A, sb, lam, M, B=None, max_iter=500, tol=10**-5, full_output=0, order
 
     if full_output:
         tt = time.time()-t0
-        print('runtime: %s' % round(tt,3))
+        print('    dr runtime: %s' % round(tt,3))
         # return w_0[1:(l+1)], min_resids[0:l], constr_resids[0:l], proj_errors[0:l], times, us[0:l], hot_resids
         return w_0, min_resids, constr_resids, proj_errors, times, us, hot_resids, tt
     else:
@@ -398,8 +402,10 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
     ## error from all zeros
     constr_resid = la.norm(constr_solver.A.dot(u) - constr_solver.b)
     min_resid = la.norm(min_solver.A.dot(u) - min_solver.b)
+    print('----- RAAR -----------------------')
     print(constr_resid,"raar constr 0")
     print(min_resid,"raar resid 0")
+    print('----- RAAR -----------------------')
     _min_resids_.append(min_resid)
     _con_resids_.append(constr_resid)
 
@@ -472,7 +478,7 @@ def raar(Kb, A, sb, lam, M, beta, B=None, max_iter=500, tol=10**-5, full_output=
 
     if full_output:
         tt = time.time()-t0
-        print('runtime: %s' % round(tt,3))
+        print('    raar runtime: %s' % round(tt,3))
         return u, _min_resids_, _con_resids_, times, us, hot_resids, tt
     else:
         return u
@@ -496,6 +502,8 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
     ## rename
     B, lam, k, X, Kb, M, R_direct, sb, w_direct = prob.B, prob.lam, prob.k, prob.X, prob.Kb, prob.M, prob.R_direct, prob.sb, prob.w_direct
     minres_A, minres_b = prob.ESI_A, prob.ESI_b
+    cg_A, cg_b = prob.ESIN_A, prob.ESIN_b
+    minres3_A, minres3_b = prob.ESI3_A, prob.ESI3_b
     n = X.shape[1]
 
     ## compute resids and errs
@@ -525,7 +533,33 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
         hot_errs = [la.norm(M.dot(Z).dot(uu)-w_direct) for uu in us]
     elif method == 'minres':
         ## compute resids
-        _, _, us, min_resids, times, tt = spsla.minres_track(A=minres_A, b=minres_b)
+        _, _, us, min_resids, times, tt = spsla.minres_track(A=minres_A, b=minres_b, tol=tol, maxiter=max_iter)
+        ## compute hot resids
+        hot_resids = []
+        for uu in us:
+            w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
+            hot_resids.append( la.norm(M.dot(R_direct).dot(Kb).dot(R_direct.T).dot(M.T).dot(w) - M.dot(R_direct).dot(sb)) )
+        ## compute hot errs
+        Z = X.T.dot(X) + lam*B.T.dot(B)
+        hot_errs = [la.norm(M.dot(Z).dot(uu[0:n])-w_direct) for uu in us]
+    elif method == 'cg':
+            ## compute resids
+            cgs = optimize.ConjugateGradientsSolver(A = cg_A, b = cg_b, full_output=1)
+            _, _, min_resids_combined = cgs.solve(tol=tol, max_iter=max_iter)  # defaults to using all zeros
+            min_resids = [r[0] for r in min_resids_combined]
+            tt = min_resids_combined[-1][1]
+            us = cgs.path()
+            ## compute hot resids
+            hot_resids = []
+            for uu in us:
+                w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
+                hot_resids.append( la.norm(M.dot(R_direct).dot(Kb).dot(R_direct.T).dot(M.T).dot(w) - M.dot(R_direct).dot(sb)) )
+            ## compute hot errs
+            Z = X.T.dot(X) + lam*B.T.dot(B)
+            hot_errs = [la.norm(M.dot(Z).dot(uu[0:n])-w_direct) for uu in us]
+    elif method == 'minres3':
+        ## compute resids
+        _, _, us, min_resids, times, tt = spsla.minres_track(A=minres3_A, b=minres3_b, tol=tol, maxiter=max_iter)
         ## compute hot resids
         hot_resids = []
         for uu in us:
@@ -545,31 +579,52 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
         u_p, min_resids_p, con_resids_p, times_p, us_p, hot_resids_p, tt_p = pocs(
             Kb, X, sb, lam, M, B=B, max_iter=max_iter, tol=tol, full_output=1, R=R_direct
         )
-        u_m, _, us_m, min_resids_m, times_m, tt_m = spsla.minres_track(A=minres_A, b=minres_b)
+        u_m, _, us_m, min_resids_m, times_m, tt_m = spsla.minres_track(A=minres_A, b=minres_b, tol=tol, maxiter=max_iter)
         ## compute minres hot resids
         hot_resids_m = []
         for uu in us_m:
             w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
             hot_resids_m.append( la.norm(M.dot(R_direct).dot(Kb).dot(R_direct.T).dot(M.T).dot(w) - M.dot(R_direct).dot(sb)) )
+
+        cgs = optimize.ConjugateGradientsSolver(A = cg_A, b = cg_b, full_output=1)
+        _, _, min_resids_combined = cgs.solve(tol=tol, max_iter=max_iter)  # defaults to using all zeros
+        min_resids_c = [r[0] for r in min_resids_combined]
+        tt_c = min_resids_combined[-1][1]
+        us_c = cgs.path()
+        ## compute minres hot resids
+        hot_resids_c = []
+        for uu in us_c:
+            w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
+            hot_resids_c.append( la.norm(M.dot(R_direct).dot(Kb).dot(R_direct.T).dot(M.T).dot(w) - M.dot(R_direct).dot(sb)) )
+
+        u_3, _, us_3, min_resids_3, times_3, tt_3 = spsla.minres_track(A=minres_A, b=minres_b, tol=tol, maxiter=max_iter)
+        ## compute minres hot resids
+        hot_resids_3 = []
+        for uu in us_m:
+            w = util.calc_hot(X=X, B=B, lam=lam, M=M, u=uu, ESI=True)
+            hot_resids_3.append( la.norm(M.dot(R_direct).dot(Kb).dot(R_direct.T).dot(M.T).dot(w) - M.dot(R_direct).dot(sb)) )
+
         ## compute hot errs
         Z = X.T.dot(X) + lam*B.T.dot(B)
         hot_errs_r = [la.norm(w_direct - M.dot(Z).dot(uu)) for uu in us_r]
         hot_errs_d = [la.norm(w_direct - M.dot(Z).dot(uu)) for uu in us_d]
         hot_errs_p = [la.norm(w_direct - M.dot(Z).dot(uu)) for uu in us_p]
         hot_errs_m = [la.norm(w_direct - M.dot(Z).dot(uu[0:n])) for uu in us_m]
+        hot_errs_c = [la.norm(w_direct - M.dot(Z).dot(uu[0:n])) for uu in us_c]
+        hot_errs_3 = [la.norm(w_direct - M.dot(Z).dot(uu[0:n])) for uu in us_3]
 
-        min_resids_all = [min_resids_r, min_resids_d, min_resids_p, min_resids_m]
-        con_resids_all = [con_resids_r, con_resids_d, con_resids_p]
-        hot_resids_all = [hot_resids_r, hot_resids_d, hot_resids_p, hot_resids_m]
-        hot_errs_all   = [hot_errs_r, hot_errs_d, hot_errs_p, hot_errs_m]
-        run_times_all  = [tt_r, tt_d, tt_p, tt_m]
+        min_resids_all = [min_resids_r, min_resids_d, min_resids_p, min_resids_m, min_resids_c, min_resids_3]
+        con_resids_all = [con_resids_r, con_resids_d, con_resids_p, np.nan, np.nan, np.nan]
+        hot_resids_all = [hot_resids_r, hot_resids_d, hot_resids_p, hot_resids_m, hot_resids_c, hot_resids_3]
+        hot_errs_all   = [hot_errs_r, hot_errs_d, hot_errs_p, hot_errs_m, hot_errs_c, hot_errs_3]
+        run_time_all  = [tt_r, tt_d, tt_p, tt_m, tt_c, tt_3]
 
         # print([len(m) for m in min_resids_all])
         # print([len(m) for m in con_resids_all])
         # print([len(m) for m in hot_resids_all])
         # print([len(m) for m in hot_errs_all])
     else:
-        print('method = `raar`, `dr`, `pocs`, or `all`')
+        print('method = `raar`, `dr`, `pocs`, `cg`, or `all`')
 
     ## plot
     if method == 'all':
@@ -582,11 +637,11 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
         print("      dr step: %s" % sl_dr)
         print("     beta: %s" % beta)
         print("===== method = %s ======================================================================\n" % method)
-        alg = ['RAAR', 'DR', 'POCS', 'MINRES']
+        alg = ['RAAR', 'DR', 'POCS', 'MINRES', 'CG', 'MINRES3']
 
-        fig, axarr = plt.subplots(nrows=2,ncols=2, figsize=(10,10))
+        fig, axarr = plt.subplots(nrows=2,ncols=3, figsize=(10,10))
         for i in range(3):
-            plt.subplot(2,2,i+1)
+            plt.subplot(2,3,i+1)
             plt.loglog(min_resids_all[i], marker='o', markersize=10)
             plt.loglog(con_resids_all[i], marker='o', markersize=10)
             plt.loglog(hot_resids_all[i], marker='o', markersize=6)
@@ -598,26 +653,26 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
                     plt.annotate('{:06.2f}'.format(Decimal(str(ysi[j][k]))), xy=(xsi[j][k], ysi[j][k]),
                         xytext=(-5, 5), ha='right', textcoords='offset points')
             plt.legend(['Min Resids '+alg[i], 'Con Resids '+alg[i], 'Hotelling Resids '+alg[i], 'Hotelling Errs '+alg[i]])
-            plt.title(alg[i]+': '+str(round(run_times_all[i],3)))
+            plt.title(alg[i]+': '+str(round(run_time_all[i],3)))
             plt.xlabel('Iteration')
             plt.ylabel('Resid & Err')
 
-        i = 3
-        plt.subplot(2,2,i+1)
-        plt.loglog(min_resids_all[i], marker='o', markersize=10)
-        plt.loglog(np.nan, marker='o', markersize=10)
-        plt.loglog(hot_resids_all[i], marker='o', markersize=6)
-        plt.loglog(hot_errs_all[i], marker='o', markersize=6)
-        for j in range(len(ysi)):
-            for k in range(1):
-                plt.annotate('{:06.2f}'.format(Decimal(str(ysi[j][k]))), xy=(xsi[j][k], ysi[j][k]),
-                    xytext=(-5, 5), ha='right', textcoords='offset points')
-        plt.legend(['Min Resids '+alg[i], 'Con Resids '+alg[i], 'Hotelling Resids '+alg[i], 'Hotelling Errs '+alg[i]])
-        plt.title(alg[i]+': '+str(round(run_times_all[i],3)))
-        plt.xlabel('Iteration')
-        plt.ylabel('Resid & Err')
+        for i in range(3,6):
+            plt.subplot(2,3,i+1)
+            plt.loglog(min_resids_all[i], marker='o', markersize=10)
+            plt.loglog(np.nan, marker='o', markersize=10)
+            plt.loglog(hot_resids_all[i], marker='o', markersize=6)
+            plt.loglog(hot_errs_all[i], marker='o', markersize=6)
+            for j in range(len(ysi)):
+                for k in range(1):
+                    plt.annotate('{:06.2f}'.format(Decimal(str(ysi[j][k]))), xy=(xsi[j][k], ysi[j][k]),
+                        xytext=(-5, 5), ha='right', textcoords='offset points')
+            plt.legend(['Min Resids '+alg[i], 'Con Resids '+alg[i], 'Hotelling Resids '+alg[i], 'Hotelling Errs '+alg[i]])
+            plt.title(alg[i]+': '+str(round(run_time_all[i],3)))
+            plt.xlabel('Iteration')
+            plt.ylabel('Resid & Err')
         plt.show()
-    elif method != 'all' and method != 'minres':
+    elif method != 'all' and method != 'minres' and method != 'cg':
         print("===== method = %s ===================================" % method)
         print("          lam: %s" % '%.2E' % Decimal(str(lam)))
         print("            k: %s" % k)
@@ -635,7 +690,7 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
         plt.ylabel('Resid & Err')
         plt.title(method+': '+str(round(tt,3)))
         plt.show()
-    elif method == 'minres':
+    elif method == 'minres' or method == 'cg' or method == 'minres3':
         print("===== method = %s ===================================" % method)
         print("          lam: %s" % '%.2E' % Decimal(str(lam)))
         print("            k: %s" % k)
@@ -653,7 +708,8 @@ def test_proj_alg(prob=None, method=None, plot=True, **kwargs):
     else:
         print('method = `raar`, `dr`, `pocs`, or `all`')
 
-    return min_resids_all, con_resids_all, hot_resids_all, hot_errs_all, run_times_all
+    if method == 'all':
+        return min_resids_all, con_resids_all, hot_resids_all, hot_errs_all, run_time_all
 
 
 
