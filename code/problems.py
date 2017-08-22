@@ -66,6 +66,8 @@ class Problem:
             else:
                 print('must specify `m` for x-ray problem')
                 sys.exit(0)
+        if self.r is None:
+            self.r = int(self.n_1/2)
 
         if bool(kwargs):
             print('=============== ??? ===============================')
