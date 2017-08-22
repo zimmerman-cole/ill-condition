@@ -479,16 +479,18 @@ def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=T
     Z = (X.T.dot(X) + lam*B.T.dot(B))
     C = Z.dot(sps.eye(n) - M.T.dot(M))
     if sparse:
-        Q = spsla.splu(Kb).dot(A)
+        Q = X  ## TODO: add choelsky of Kb for sparse, ok for now bc K diag ones
+        A22 = -sps.eye(n)
     else:
-        Q = la.cholesky(Kb).dot(A)
+        Q = X  ## TODO: add choelsky of Kb for sparse, ok for now bc K diag ones
+        A22 = -sps.eye(n)
 
     ## block LHS
     A11 = None
     A12 = Q.T
     A13 = C.T
     A21 = Q
-    A22 = -sps.eye(n)
+    # A22 definted above
     A23 = None
     A31 = C
     A32 = None

@@ -189,7 +189,7 @@ class Problem:
 
         ## generate ESI3 equations ---------------------------------------------
         if self.ESI3:
-            self.ESI3_A, self.ESI3_b = util.gen_ESI_system(   X=self.X, Kb=self.Kb, B=self.B, \
+            self.ESI3_A, self.ESI3_b = util.gen_ESI3_system(   X=self.X, Kb=self.Kb, B=self.B, \
                                                             M=self.M, lam=self.lam, sb=self.sb  )
 
     def _set_direct(self, **kwargs):
@@ -220,7 +220,7 @@ class Problem:
         self.sb = self.X.dot(self.sx)
 
         ## set direct ESI systems ----------------------------------------------
-        if self.ESI or self.ESIN:
+        if self.ESI or self.ESIN or self.ESI3:
             self._set_systems(**kwargs)
 
         ## set direct solution -------------------------------------------------
@@ -236,6 +236,7 @@ class Problem:
         print('t             = ' + str(self.t))
         print('ESI?          = ' + str(self.ESI))
         print('ESIN?         = ' + str(self.ESIN))
+        print('ESI3?         = ' + str(self.ESI3))
         print('direct?       = ' + str(self.dir_soln))
         print('================= dimensions ==================')
         print('Kb shape      = ' + str(self.Kb.shape))
@@ -252,6 +253,8 @@ class Problem:
         print('ESI_b shape   = ' + str(self.ESI_b.shape))
         print('ESIN_A shape  = ' + str(self.ESIN_A.shape))
         print('ESIN_b shape  = ' + str(self.ESIN_b.shape))
+        print('ESI3_A shape  = ' + str(self.ESI3_A.shape))
+        print('ESI3_b shape  = ' + str(self.ESI3_b.shape))
 
 if __name__ == '__main__':
     ## 1D BLUR
