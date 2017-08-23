@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as la
+from numpy.lib import scimath
 import scipy.linalg as sla
 import scipy.sparse.linalg as spsla
 import scipy.sparse as sps
@@ -417,10 +418,13 @@ def calc_hot(X=None, B=None, lam=None, M=None, u=None, ESI=False):
     ## intermediate matrix
     Z = X.T.dot(X) + lam*B.T.dot(B)
 
+
     if ESI:
-        return M.dot(Z).dot(u[0:n])
+        w = M.dot(Z).dot(u[0:n])
+        return w.reshape(len(w),1)
     else:
-        return M.dot(Z).dot(u)
+        w = M.dot(Z).dot(u)
+        return w.reshape(len(w),1)
 
 def direct_rxn(X=None, lam=None, B=None, sparse=True):
     n = X.shape[1]
@@ -441,8 +445,10 @@ def direct_solve(Kb=None, R=None, M=None, B=None, sb=None, sparse=True):
     sx = MR.dot(sb)
     if sparse:
         w = spsla.spsolve(Kx,sx)
+        w = w.reshape(len(w),1)
     else:
         w = la.solve(Kx,sx)
+        w = w.reshape(len(w),1)
     return w, Kx, sx
 
 def gen_ESI_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None):
@@ -468,7 +474,7 @@ def gen_ESI_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None):
 
     return A, b
 
-def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=True):
+def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=True, Kb_is_diag=True):
     """
     Generates "Equivalent Symmetric Indefinite" LHS and RHS based on III
     """
@@ -479,11 +485,30 @@ def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=T
     Z = (X.T.dot(X) + lam*B.T.dot(B))
     C = Z.dot(sps.eye(n) - M.T.dot(M))
     if sparse:
-        Q = X  ## TODO: add choelsky of Kb for sparse, ok for now bc K diag ones
+        if Kb_is_diag:
+            print((Kb))
+            print(type(Kb))
+            print(type(Kb.diagonal))
+            K_12 = sps.spdiags([np.lib.scimath.sqrt(x) for x in Kb.diagonal()], diags=0, m=n, n=n)
+        else:
+            lu = spsla.splu(Kb)
+            D_12 = sps.spdiags([np.lib.scimath.sqrt(x) for x in np.diag(lu.U.A)], diags=0, m=n, n=n)
+            L = lu.L
+            L_permuted = L.dot(D_12)
+            Pr = sps.csc_matrix((n, n))
+            Pc = sps.csc_matrix((n, n))
+            Pr[lu.perm_r, np.arange(n)] = 1
+            Pc[np.arange(n), lu.perm_c] = 1
+            K_12 = Pr.T.dot(L_unarranged).dot(Pc.T)
+        Q = X.dot(K_12)
         A22 = -sps.eye(n)
     else:
-        Q = X  ## TODO: add choelsky of Kb for sparse, ok for now bc K diag ones
-        A22 = -sps.eye(n)
+        if Kb_is_diag:
+            K_12 = np.diag([np.lib.scimath.sqrt(x) for x in np.diag(Kb)], diags=0, m=n, n=n)
+        else:
+            K_12 = la.cholesky(Kb)
+        Q = X.dot(K_12)
+        A22 = -np.eye(n)
 
     ## block LHS
     A11 = None
@@ -502,29 +527,6 @@ def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=T
     b = np.concatenate([np.zeros(n).reshape(n,), b1.reshape(n,), np.zeros(n).reshape(n,)])
 
     return A, b
-
-def direct_rxn(X=None, lam=None, B=None, sparse=True):
-    n = X.shape[1]
-    if B is None:
-        B = np.diag(np.ones(n))
-        A = X.T.dot(X) + lam*B.T.dot(B)
-    A = X.T.dot(X) + lam*B.T.dot(B)
-    if sparse:
-        R = spsla.spsolve(A, X.T, use_umfpack=True)
-    else:
-        R = la.solve(A, X.T)
-    return R
-
-def direct_solve(Kb=None, R=None, M=None, lam=None, B=None, sb=None, sparse=True):
-    MR = M.dot(R)
-    Lx = MR.dot(Kb)
-    Kx = Lx.dot(MR.T)
-    sx = MR.dot(sb)
-    if sparse:
-        w = spsla.spsolve(Kx,sx)
-    else:
-        w = la.solve(Kx,sx)
-    return w, Kx, sx
 
 def gen_ESI_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None):
     """
