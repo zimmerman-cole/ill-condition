@@ -134,7 +134,7 @@ class Problem:
             sys.exit(0)
 
         ## vectorize image to generate true signal -----------------------------
-        self.sx = self.f.flatten("F").reshape(self.n,1)
+        self.sx = self.f.flatten('F').reshape(self.n, 1, order='F')
 
     def _set_operators(self, **kwargs):
         ## generate Kb and operators X & M -------------------------------------
@@ -218,6 +218,9 @@ class Problem:
 
         ## set data signal -----------------------------------------------------
         self.sb = self.X.dot(self.sx)
+        plt.imshow(self.sb.reshape(self.n_1, self.n_2, order='F'))
+        plt.title('blurred image')
+        plt.show()
 
         ## set direct ESI systems ----------------------------------------------
         if self.ESI or self.ESIN or self.ESI3:
