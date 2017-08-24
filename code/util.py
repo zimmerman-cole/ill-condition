@@ -429,8 +429,10 @@ def calc_hot(X=None, B=None, lam=None, M=None, u=None, ESI=False):
 def direct_rxn(X=None, lam=None, B=None, sparse=True):
     n = X.shape[1]
     if B is None:
-        B = np.diag(np.ones(n))
-        A = X.T.dot(X) + lam*B.T.dot(B)
+        if sparse:
+            B = sps.eye(n)
+        else:
+            B = np.diag(np.ones(n))
     A = X.T.dot(X) + lam*B.T.dot(B)
     if sparse:
         R = spsla.spsolve(A, X.T, use_umfpack=True)
