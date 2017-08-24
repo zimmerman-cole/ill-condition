@@ -23,20 +23,25 @@ def gen_f_rect(n_1, n_2, levels=3, save=False, plot=True):
     Returns:
         - f_rect: image with `levels` of intensities
     """
-    f_rect = np.zeros([n_1,n_2])
-    step_1 = int(np.floor(n_1/2.)/(levels+1))
-    step_2 = int(np.floor(n_2/2.)/(levels+1))
-    c_1 = int(np.floor(n_1/2.))
-    c_2 = int(np.floor(n_2/2.))
+    if levels > 1:
+        f_rect = np.zeros([n_1,n_2])
+        step_1 = int(np.floor(n_1/2.)/(levels+1))
+        step_2 = int(np.floor(n_2/2.)/(levels+1))
+        c_1 = int(np.floor(n_1/2.))
+        c_2 = int(np.floor(n_2/2.))
 
-    if levels >= min(c_1,c_2):
-        raise ValueError("too many levels for pixel resolution; reduce levels")
+        if levels >= min(c_1,c_2):
+            raise ValueError("too many levels for pixel resolution; reduce levels")
 
-    for l in range(levels+1,1,-1):
-        i = c_1 - l*step_1
-        j = c_2 - l*step_2
-        f_rect[(i+1):-(i+1), (j+1):-(j+1)] += l
-
+        for l in range(levels+1,1,-1):
+            i = c_1 - l*step_1
+            j = c_2 - l*step_2
+            f_rect[(i+1):-(i+1), (j+1):-(j+1)] += l
+    else:
+        f_rect = np.zeros([n_1,n_2])
+        lr = int(n_2/10.)
+        ud = int(n_1/10.)
+        f_rect[int(n_1/2.-ud):int(n_1/2.+ud),int(n_2/2.-lr):int(n_2/2.+lr)] = 50
     if save:
         name = "f_rect"+"_"+str(n_1)+"_"+str(n_2)+"_"+str(levels)
         np.save(name,f_rect)

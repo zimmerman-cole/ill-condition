@@ -70,11 +70,13 @@ class Problem:
         if self.r is None:
             self.r = int(self.n_1/2)
 
+        ## set defaults --------------------------------------------------------
+        self.levels = kwargs.get('levels',3)
+        self.plot = kwargs.get('plot',True)
+
         if bool(kwargs):
-            print('=============== ??? ===============================')
-            print('Solver constructor received unexpected arguments:')
+            print('=============== Setting Defaults ==================')
             print(kwargs)
-            print('Ignoring them and continuing anyways')
             print('===================================================')
 
     def __str__(self):
@@ -110,25 +112,9 @@ class Problem:
     def _set_image(self, **kwargs):
         ## generate image f ----------------------------------------------------
         if self.dim == 1:
-            if 'plot' in kwargs:
-                plot = kwargs['plot']
-                self.f = blur_1d.gen_f(self.n, plot=plot)
-            else:
-                self.f = blur_1d.gen_f(self.n)
+            self.f = blur_1d.gen_f(self.n, plot=self.plot)
         elif self.dim == 2:
-            if 'levels' in kwargs:
-                levels = kwargs['levels']
-                if 'plot' in kwargs:
-                    plot = kwargs['plot']
-                    self.f = blur_2d.gen_f_rect(self.n_1, self.n_2, levels=levels,plot=plot)
-                else:
-                    self.f = blur_2d.gen_f_rect(self.n_1, self.n_2, levels=levels)
-            else:
-                if 'plot' in kwargs:
-                    plot = kwargs['plot']
-                    self.f = blur_2d.gen_f_rect(self.n_1, self.n_2, plot=plot)
-                else:
-                    self.f = blur_2d.gen_f_rect(self.n_1, self.n_2)
+            self.f = blur_2d.gen_f_rect(self.n_1, self.n_2, levels=self.levels, plot=self.plot)
         else:
             print('dim > 2 not implemented yet')
             sys.exit(0)
