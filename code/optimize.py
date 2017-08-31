@@ -1,16 +1,34 @@
+"""
+Solvers of linear systems of equations.
+
+    -   Conjugate Gradients
+    -   Direct Solve (via scipy.linalg/scipy.sparse.linalg)
+    -   via Decomposition (LU/QR/Cholesky)
+    -   Gradient Descent
+    -   Preconditioned Conjugate Gradients (partially implemented)
+    -   Iterative Refinement (w/ option of constant or decaying epsilon)
+            (see IterativeRefinementSolver and
+             IterativeRefinementGeneralSolver for more info)
+    -   A number of other (obsolete?) methods, including:
+        -   Arnoldi Iterations
+        -   Jacobi Iterations
+        -   (Attempts at) GD/CG solvers for non-positive-definite matrices.
+"""
+import sys
+import time
+from collections import OrderedDict
+
 import numpy as np
 import numpy.linalg as la
+
+import scipy
+from scipy import optimize as scopt
 import scipy.linalg as sla
 import scipy.sparse as sp
 import scipy.sparse.linalg as sparsela
-import traceback, sys, scipy, time, sklearn
-from scipy import optimize as scopt
-from collections import OrderedDict
-from sklearn.linear_model import SGDClassifier
 
-# TODO: make these methods compatible with scipy sparse matrices
-#       i.e.    -remove all len(A) where A is sparse
-#               -replace all np.dot(A, _) w/ A.dot(_)
+import sklearn
+from sklearn.linear_model import SGDClassifier
 
 class Solver:
     """
@@ -23,11 +41,11 @@ class Solver:
         self.full_output = full_output
 
         if bool(kwargs):
-            print('=============== ??? ===============================')
-            print('Solver constructor received unexpected arguments:')
-            print(kwargs)
-            print('Ignoring them and continuing anyways')
-            print('===================================================')
+            print '=============== ??? ==============================='
+            print 'Solver constructor received unexpected arguments:'
+            print kwargs
+            print 'Ignoring them and continuing anyways'
+            print '==================================================='
 
 
     def _check_ready(self):
@@ -44,7 +62,7 @@ class Solver:
             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
 
 
-    def solve(self, tol=10**-5, x_0 = None, max_iter = 500, x_true = None, **kwargs):
+    def solve(self, tol=10**-5, x_0=None, max_iter=500, x_true=None, **kwargs):
         """
         Solve the linear system Ax = b for x.
 
@@ -103,13 +121,13 @@ class Solver:
         Make sure _full, _bare and path give roughly the same x.
         """
         x_0 = np.random.randn(self.A.shape[0])
-        x_full = self._full(tol=10**-5, x=np.copy(x_0),   max_iter=500, recalc=20, x_true=None)[0]
-        x_bare = self._bare(tol=10**-5, x=np.copy(x_0),   max_iter=500, recalc=20)
-        x_path = self.path(tol=10**-5,  x_0=np.copy(x_0), max_iter=500, recalc=20)[-1]
+        x_full = self._full(tol=10**-5, x=np.copy(x_0), max_iter=500, recalc=20, x_true=None)[0]
+        x_bare = self._bare(tol=10**-5, x=np.copy(x_0), max_iter=500, recalc=20)
+        x_path = self.path(tol=10**-5, x_0=np.copy(x_0), max_iter=500, recalc=20)[-1]
 
-        print('Full-bare: %f' % la.norm(x_full - x_bare))
-        print('Full-path: %f' % la.norm(x_full - x_path))
-        print('Bare-path: %f' % la.norm(x_bare - x_path))
+        print 'Full-bare: %f' % la.norm(x_full - x_bare)
+        print 'Full-path: %f' % la.norm(x_full - x_path)
+        print 'Bare-path: %f' % la.norm(x_bare - x_path)
 
 class DirectInverseSolver(Solver):
 
@@ -174,7 +192,7 @@ class DirectInverseSolver(Solver):
     def _bare(self, tol, x, max_iter, **kwargs):
         return self.A_inv.dot(self.b)
 
-    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         path = [x]
         x = self.A_inv.dot(self.b)
         path.append(x)
@@ -244,7 +262,7 @@ class DecompositionSolver(Solver):
 
         ## solve
         if self.d_type == 'qr':
-            y = np.dot(self.L.T,self.b)
+            y = np.dot(self.L.T, self.b)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         elif self.d_type == 'lu':
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
@@ -253,7 +271,7 @@ class DecompositionSolver(Solver):
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         else:
-            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            print "solver type not supported; use `qr, ``lu`, `cholesky`"
             sys.exit()
 
         ## residuals (1)
@@ -288,7 +306,7 @@ class DecompositionSolver(Solver):
             self.R = sp.csr_matrix(self.R)
 
         if self.d_type == 'qr':
-            y = np.dot(self.L.T,self.b)
+            y = np.dot(self.L.T, self.b)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         elif self.d_type == 'lu':
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
@@ -297,11 +315,11 @@ class DecompositionSolver(Solver):
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         else:
-            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            print "solver type not supported; use `qr, ``lu`, `cholesky`"
             sys.exit()
         return x
 
-    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         self._check_ready()
         if x_0 is None:
             x = np.zeros(self.A.shape[1])
@@ -329,7 +347,7 @@ class DecompositionSolver(Solver):
 
         path = [x]
         if self.d_type == 'qr':
-            y = np.dot(self.L.T,self.b)
+            y = np.dot(self.L.T, self.b)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         elif self.d_type == 'lu':
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
@@ -338,7 +356,7 @@ class DecompositionSolver(Solver):
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         else:
-            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            print "solver type not supported; use `qr, ``lu`, `cholesky`"
             sys.exit()
         path.append(x)
         return path
@@ -480,7 +498,7 @@ class GradientDescentSolver(Solver):
 
         return x
 
-    def path(self, tol = 10**-5, x_0 = None, max_iter=500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         """
         Returns list of points traversed during descent.
         """
@@ -633,7 +651,7 @@ class ConjugateGradientsSolver(Solver):
                     ## TODO: https://link-springer-com.proxy.uchicago.edu/content/pdf/10.1007%2FBF01593790.pdf
                     d = new_r
                 else:
-                    print("must specify restart direction method")
+                    print "must specify restart direction method"
                     sys.exit()
             else:
                 d = new_r + beta * d
@@ -698,7 +716,7 @@ class ConjugateGradientsSolver(Solver):
 
         return x
 
-    def path(self, tol = 10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         if 'recalc' not in kwargs:
             recalc = 20
         else:
@@ -906,7 +924,7 @@ class TransPreCGSolver(Solver):
         tr_A = np.dot(Einv, np.dot(self.A, Einv.T)) # (E^-1) (A) (E^-1).T
         tr_b = np.dot(Einv, self.b)               # transformed A(^), b
 
-        print('TRANSFORMED CONDITION NUMBER: %f' % la.cond(tr_A))
+        print 'TRANSFORMED CONDITION NUMBER: %f' % la.cond(tr_A)
 
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
@@ -1159,7 +1177,7 @@ class IterativeRefinementSolver(Solver):
 
         return x
 
-    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         if 'eps' not in kwargs:
             if sp.issparse(self.A):
                 eps = 2 * sparsela.norm(self.A)
@@ -1283,11 +1301,11 @@ class IterativeRefinementGeneralSolver(Solver):
             A_e = self.A + eps * np.identity(len(self.A))
 
             ## call intermediate solver method
-            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
-            d_i, i_i, r_i, x_d_i = solver_object.solve( tol=10**-5, x_0=r, max_iter=self.intermediate_iter, \
-                                                         recalc=20, x_true=x_true, d_type=self.d_type )
-            # residuals.append((la.norm(r_i),time.time() - start_time))
-            # x_difs.append(la.norm(x_d_i))
+            solver_object = self.intermediate_solver(A_e, r, full_output=self.full_output)
+            d_i, i_i, r_i, x_d_i = solver_object.solve(
+                tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20, \
+                x_true=x_true, d_type=self.d_type
+                )
 
             ## update x
             x += d_i
@@ -1316,13 +1334,14 @@ class IterativeRefinementGeneralSolver(Solver):
             A_e = self.A + eps * np.identity(len(self.A))
 
             ## call intermediate solver method
-            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
-            d_i, i, r_i, x_d_i = solver_object.solve(tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20, x_true=None)
+            solver_object = self.intermediate_solver(A_e, r, full_output=self.full_output)
+            d_i, i, r_i, x_d_i = solver_object.solve(tol=10**-5, x_0=r, \
+                max_iter=self.intermediate_iter, recalc=20, x_true=None)
             x += d_i
 
         return x
 
-    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         if 'eps' not in kwargs:
             eps = 2 * la.norm(self.A)
         else:
@@ -1347,7 +1366,7 @@ class IterativeRefinementGeneralSolver(Solver):
             A_e = self.A + eps * np.identity(len(self.A))
 
             ## call intermediate solver method
-            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
+            solver_object = self.intermediate_solver(A_e, r, full_output=self.full_output)
             d_i, i, r_i = solver_object.solve(tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20,x_true=None)
             x += d_i
 
@@ -2090,7 +2109,7 @@ def conjugate_gradient_psd(A,b,x_0=None,x_tru=None,tol=10**-3,max_iter=500,recal
     del_new = np.dot(r,r)
     del_0 = np.copy(del_new)
 
-    if full_output == True:
+    if full_output:
         resids = OrderedDict()
         start_time = time.time()
         resids[i] = la.norm(b-np.dot(A,x))
@@ -2115,12 +2134,12 @@ def conjugate_gradient_psd(A,b,x_0=None,x_tru=None,tol=10**-3,max_iter=500,recal
         d = r + beta*d
         i += 1
 
-        if full_output == True:
+        if full_output:
             resids[i] = la.norm(b-np.dot(A,x))
             if x_tru is not None:
                 errs[i] = la.norm(x-x_tru)
 
-    if full_output == True:
+    if full_output:
         resids[i] = la.norm(b-np.dot(A,x))
         if i < max_iter:
             status = True
