@@ -1,16 +1,30 @@
+"""
+Solvers of linear systems of equations.
+
+    -   Conjugate Gradients
+    -   Direct Solve (via scipy.linalg/scipy.sparse.linalg)
+    -   via Decomposition (LU/QR/Cholesky)
+    -   Gradient Descent
+    -   Preconditioned Conjugate Gradients (partially implemented)
+    -   Iterative Refinement (w/ option of constant or decaying epsilon)
+            (see IterativeRefinementSolver and
+             IterativeRefinementGeneralSolver for more info)
+    -   A number of other (obsolete?) methods, including:
+        -   Arnoldi Iterations
+        -   Jacobi Iterations
+        -   (Attempts at) GD/CG solvers for non-positive-definite matrices.
+"""
+import sys
+import time
+from collections import OrderedDict
+
 import numpy as np
 import numpy.linalg as la
+
+from scipy import optimize as scopt
 import scipy.linalg as sla
 import scipy.sparse as sp
 import scipy.sparse.linalg as sparsela
-import traceback, sys, scipy, time, sklearn
-from scipy import optimize as scopt
-from collections import OrderedDict
-from sklearn.linear_model import SGDClassifier
-
-# TODO: make these methods compatible with scipy sparse matrices
-#       i.e.    -remove all len(A) where A is sparse
-#               -replace all np.dot(A, _) w/ A.dot(_)
 
 class Solver:
     """
@@ -23,11 +37,11 @@ class Solver:
         self.full_output = full_output
 
         if bool(kwargs):
-            print('=============== ??? ===============================')
-            print('Solver constructor received unexpected arguments:')
-            print(kwargs)
-            print('Ignoring them and continuing anyways')
-            print('===================================================')
+            print '=============== ??? ==============================='
+            print 'Solver constructor received unexpected arguments:'
+            print kwargs
+            print 'Ignoring them and continuing anyways'
+            print '==================================================='
 
 
     def _check_ready(self):
@@ -44,7 +58,7 @@ class Solver:
             raise la.LinAlgError('A\'s dimensions do not line up with b\'s.')
 
 
-    def solve(self, tol=10**-5, x_0 = None, max_iter = 500, x_true = None, **kwargs):
+    def solve(self, tol=10**-5, x_0=None, max_iter=500, x_true=None, **kwargs):
         """
         Solve the linear system Ax = b for x.
 
@@ -103,15 +117,19 @@ class Solver:
         Make sure _full, _bare and path give roughly the same x.
         """
         x_0 = np.random.randn(self.A.shape[0])
-        x_full = self._full(tol=10**-5, x=np.copy(x_0),   max_iter=500, recalc=20, x_true=None)[0]
-        x_bare = self._bare(tol=10**-5, x=np.copy(x_0),   max_iter=500, recalc=20)
-        x_path = self.path(tol=10**-5,  x_0=np.copy(x_0), max_iter=500, recalc=20)[-1]
+        x_full = self._full(tol=10**-5, x=np.copy(x_0), max_iter=500, recalc=20, x_true=None)[0]
+        x_bare = self._bare(tol=10**-5, x=np.copy(x_0), max_iter=500, recalc=20)
+        x_path = self.path(tol=10**-5, x_0=np.copy(x_0), max_iter=500, recalc=20)[-1]
 
-        print('Full-bare: %f' % la.norm(x_full - x_bare))
-        print('Full-path: %f' % la.norm(x_full - x_path))
-        print('Bare-path: %f' % la.norm(x_bare - x_path))
+        print 'Full-bare: %f' % la.norm(x_full - x_bare)
+        print 'Full-path: %f' % la.norm(x_full - x_path)
+        print 'Bare-path: %f' % la.norm(x_bare - x_path)
 
 class DirectInverseSolver(Solver):
+    """
+    Directly solves the system using scipy.linalg.inv (or
+    scipy.sparse.linalg.inv for sparse matrices).
+    """
 
     def __init__(self, A, b, full_output=False):
         self.A = A
@@ -174,7 +192,7 @@ class DirectInverseSolver(Solver):
     def _bare(self, tol, x, max_iter, **kwargs):
         return self.A_inv.dot(self.b)
 
-    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         path = [x]
         x = self.A_inv.dot(self.b)
         path.append(x)
@@ -237,14 +255,14 @@ class DecompositionSolver(Solver):
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
 
-        ## residuals (0)
+        # residuals (0)
         r = self.b - self.A.dot(x)
         r_norm = la.norm(r)
         residuals.append((r_norm, time.time() - start_time))
 
-        ## solve
+        # solve
         if self.d_type == 'qr':
-            y = np.dot(self.L.T,self.b)
+            y = np.dot(self.L.T, self.b)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         elif self.d_type == 'lu':
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
@@ -253,7 +271,7 @@ class DecompositionSolver(Solver):
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         else:
-            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            print "solver type not supported; use `qr, ``lu`, `cholesky`"
             sys.exit()
 
         ## residuals (1)
@@ -288,7 +306,7 @@ class DecompositionSolver(Solver):
             self.R = sp.csr_matrix(self.R)
 
         if self.d_type == 'qr':
-            y = np.dot(self.L.T,self.b)
+            y = np.dot(self.L.T, self.b)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         elif self.d_type == 'lu':
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
@@ -297,11 +315,11 @@ class DecompositionSolver(Solver):
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
         else:
-            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            print "solver type not supported; use `qr, ``lu`, `cholesky`"
             sys.exit()
         return x
 
-    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         self._check_ready()
         if x_0 is None:
             x = np.zeros(self.A.shape[1])
@@ -316,12 +334,14 @@ class DecompositionSolver(Solver):
         if self.d_type == 'qr':
             self.L, self.R = la.qr(self.A)
             self.R = sp.csr_matrix(self.R)
-        if self.d_type == 'lu':
+
+        elif self.d_type == 'lu':
             P, self.L, self.R = sla.lu(self.A)
             self.L = np.dot(P, self.L)
             self.L = sp.csr_matrix(self.L)
             self.R = sp.csr_matrix(self.R)
-        if self.d_type == 'cholesky':
+
+        elif self.d_type == 'cholesky':
             self.L = la.cholesky(self.A)
             self.R = self.L.T
             self.L = sp.csr_matrix(self.L)
@@ -329,18 +349,23 @@ class DecompositionSolver(Solver):
 
         path = [x]
         if self.d_type == 'qr':
-            y = np.dot(self.L.T,self.b)
+            y = np.dot(self.L.T, self.b)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
+
         elif self.d_type == 'lu':
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
+
         elif self.d_type == 'cholesky':
             y = sparsela.spsolve_triangular(self.L, self.b, lower=True)
             x = sparsela.spsolve_triangular(self.R, y, lower=False)
+
         else:
-            print("solver type not supported; use `qr, ``lu`, `cholesky`")
+            print "solver type not supported; use `qr, ``lu`, `cholesky`"
             sys.exit()
+
         path.append(x)
+
         return path
 
 # || b - Ax ||
@@ -480,7 +505,7 @@ class GradientDescentSolver(Solver):
 
         return x
 
-    def path(self, tol = 10**-5, x_0 = None, max_iter=500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         """
         Returns list of points traversed during descent.
         """
@@ -633,7 +658,7 @@ class ConjugateGradientsSolver(Solver):
                     ## TODO: https://link-springer-com.proxy.uchicago.edu/content/pdf/10.1007%2FBF01593790.pdf
                     d = new_r
                 else:
-                    print("must specify restart direction method")
+                    print "must specify restart direction method"
                     sys.exit()
             else:
                 d = new_r + beta * d
@@ -698,7 +723,7 @@ class ConjugateGradientsSolver(Solver):
 
         return x
 
-    def path(self, tol = 10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         if 'recalc' not in kwargs:
             recalc = 20
         else:
@@ -906,7 +931,7 @@ class TransPreCGSolver(Solver):
         tr_A = np.dot(Einv, np.dot(self.A, Einv.T)) # (E^-1) (A) (E^-1).T
         tr_b = np.dot(Einv, self.b)               # transformed A(^), b
 
-        print('TRANSFORMED CONDITION NUMBER: %f' % la.cond(tr_A))
+        print 'TRANSFORMED CONDITION NUMBER: %f' % la.cond(tr_A)
 
         if x_true is not None:
             x_difs = [la.norm(x - x_true)]
@@ -1064,7 +1089,7 @@ class AltPreCGSolver(Solver):
 
 
 
-# TODO: add parameter governing epsilon's decay rate
+# TODO: remove this and any references to it
 class IterativeRefinementSolver(Solver):
     """
     Solves Ad = r by directly inverting A (d = A^-1 r).
@@ -1159,7 +1184,7 @@ class IterativeRefinementSolver(Solver):
 
         return x
 
-    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         if 'eps' not in kwargs:
             if sp.issparse(self.A):
                 eps = 2 * sparsela.norm(self.A)
@@ -1199,6 +1224,15 @@ class IterativeRefinementSolver(Solver):
         return path
 
 class IterativeRefinementGeneralSolver(Solver):
+    """
+    Iterative refinement solver with the option to either 
+    keep a constant epsilon or have it decay at each iteration.
+
+    Essentially a form of continuation adding a multiple of the 
+    identity matrix (Tikhonov regularization) to A at each 
+    iteration, solving for that system, and feeding the resulting
+    solution to the system of the next iteration.
+    """
 
     # OVERRIDES Solver CONSTRUCTOR
     def __init__(self, A=None, b=None, full_output=False, \
@@ -1267,29 +1301,32 @@ class IterativeRefinementGeneralSolver(Solver):
 
         i = 0
         while i < max_iter:
-            ## track
+            # track
             if x_true is not None:
                 x_difs.append(la.norm(x - x_true))
+
             r = self.b - np.dot(self.A, x)
             r_norm = la.norm(r)
             residuals.append((r_norm, time.time() - start_time))
 
             if r_norm <= tol:
                 break
+            
             i += 1
 
             if self.intermediate_continuation == True:
                 eps *= decay_rate
             A_e = self.A + eps * np.identity(len(self.A))
 
-            ## call intermediate solver method
-            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
-            d_i, i_i, r_i, x_d_i = solver_object.solve( tol=10**-5, x_0=r, max_iter=self.intermediate_iter, \
-                                                         recalc=20, x_true=x_true, d_type=self.d_type )
-            # residuals.append((la.norm(r_i),time.time() - start_time))
-            # x_difs.append(la.norm(x_d_i))
+            # call intermediate solver method
+            solver_object = self.intermediate_solver(A_e, r, full_output=self.full_output)
 
-            ## update x
+            d_i, i_i, r_i, x_d_i = solver_object.solve(
+                tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20, \
+                x_true=x_true, d_type=self.d_type
+                )
+
+            # update x
             x += d_i
 
 
@@ -1316,13 +1353,14 @@ class IterativeRefinementGeneralSolver(Solver):
             A_e = self.A + eps * np.identity(len(self.A))
 
             ## call intermediate solver method
-            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
-            d_i, i, r_i, x_d_i = solver_object.solve(tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20, x_true=None)
+            solver_object = self.intermediate_solver(A_e, r, full_output=self.full_output)
+            d_i, i, r_i, x_d_i = solver_object.solve(tol=10**-5, x_0=r, \
+                max_iter=self.intermediate_iter, recalc=20, x_true=None)
             x += d_i
 
         return x
 
-    def path(self, tol=10**-5, x_0=None, max_iter = 500, **kwargs):
+    def path(self, tol=10**-5, x_0=None, max_iter=500, **kwargs):
         if 'eps' not in kwargs:
             eps = 2 * la.norm(self.A)
         else:
@@ -1342,13 +1380,16 @@ class IterativeRefinementGeneralSolver(Solver):
             if la.norm(r) <= tol:
                 break
 
-            if self.intermediate_continuation == True:
+            if self.intermediate_continuation:
                 eps *= 0.5
+
             A_e = self.A + eps * np.identity(len(self.A))
 
-            ## call intermediate solver method
-            solver_object = self.intermediate_solver(A_e,r,full_output=self.full_output)
-            d_i, i, r_i = solver_object.solve(tol=10**-5, x_0=r, max_iter=self.intermediate_iter, recalc=20,x_true=None)
+            # call intermediate solver method
+            solver_object = self.intermediate_solver(A_e, r, full_output=self.full_output)
+            d_i, i, r_i = solver_object.solve(tol=10**-5, x_0=r, \
+                max_iter=self.intermediate_iter, recalc=20, x_true=None)
+            
             x += d_i
 
             path.append(x)
@@ -1361,8 +1402,6 @@ class IterativeRefinementGeneralSolver(Solver):
 
 
 # TODO: BiCGStab
-
-# TODO: L-BFGS (use scipy?)
 
 
 
@@ -1407,11 +1446,11 @@ def conjugate_gs_alt(U, A):
     """
     n = len(U)
     D = np.copy(U)
-    beta = np.zeros([n,n])
+    beta = np.zeros([n, n])
 
     D[:, 0] = U[:, 0]
     for i in range(1, n):
-        for j in range(0,i-1):
+        for j in range(0, i-1):
 
             Adj = np.dot(A, D[:, j])
 
@@ -1424,7 +1463,7 @@ def conjugate_gs_alt(U, A):
     for i in range(0, n-1):
         for j in range(i+1,n):
             # print( np.dot(U[:, i],np.dot(A,D[:, j])) + beta[i, j]*np.dot(D[:, j].T,np.dot(A,D[:, j])) )
-            print( np.dot(D[:,i], np.dot(A, D[:,j])) )
+            print( np.dot(D[:, i], np.dot(A, D[:, j])) )
 
     return D
 
@@ -1444,7 +1483,7 @@ def conjugate_gs(u, A):
     d = np.copy(u)
 
     for i in range(1, n):
-        for j in range(0,i):
+        for j in range(0, i):
 
             Adj = np.dot(A, d[:, j])
 
@@ -1473,33 +1512,33 @@ def arnoldi(A,b):
 
     ## initialize
     n = len(A)
-    Q = np.zeros([n,n])
-    H = np.zeros([n,n])
+    Q = np.zeros([n, n])
+    H = np.zeros([n, n])
 
     ## first vector
     Q[:,0] = b/la.norm(b)
 
     ## remaining vectors
-    for j in range(n-1):               # start computation for Q[:,j+1]
-        t = np.dot(A,Q[:,j])           # t \in K^[j+1](A,b)
+    for j in range(n-1):                  # start computation for Q[:,j+1]
+        t = np.dot(A, Q[:, j])            # t \in K^[j+1](A,b)
         for i in range(j+1):
-            H[i,j] = np.dot(Q[:,i],t)  # H[i,j] * Q[:,i] is proj of t onto Q[:,i]
-            t -= H[i,j] * Q[:,i]       # remove proj (ORTHO)
-        H[j+1,j] = la.norm(t)
-        Q[:,j+1] = t/H[j+1,j]          # normalize (NORMALIZE)
+            H[i, j] = np.dot(Q[:, i], t)  # H[i,j] * Q[:,i] is proj of t onto Q[:,i]
+            t -= H[i, j] * Q[:, i]        # remove proj (ORTHO)
+        H[j+1, j] = la.norm(t)
+        Q[:, j+1] = t/H[j+1, j]           # normalize (NORMALIZE)
 
     ## last column of H
-    H[:,n-1] = np.dot(Q.T,np.dot(A,Q[:,n-1]))
-    return Q,H
+    H[:, n-1] = np.dot(Q.T,np.dot(A,Q[:, n-1]))
+    return Q, H
 
-def test_arnoldi(A,b):
-    Q,H = arnoldi(A,b)
+def test_arnoldi(A, b):
+    Q,H = arnoldi(A, b)
     for i in range(len(Q)):
         for j in range(i):
-            print(np.dot(Q[:,i],Q[:,j]))
-    print(H - np.dot(Q.T,np.dot(A,Q)))
+            print(np.dot(Q[:, i],Q[:, j]))
+    print(H - np.dot(Q.T, np.dot(A, Q)))
 
-def jacobi(A,b,tol=0.001,maxiter=1000,x_0=None):
+def jacobi(A, b, tol=0.001, maxiter=1000, x_0=None):
     '''
     Solves Ax = b with Jacobi splitting method
         A \in R^[n x n]
@@ -1515,33 +1554,33 @@ def jacobi(A,b,tol=0.001,maxiter=1000,x_0=None):
     n = A.shape[0]
 
     ## start
-    if x_0 == None:
+    if x_0 is None:
         x_0 = np.random.randn(n)
 
     ## construct matrix components
-    D = np.zeros([n,n])
+    D = np.zeros([n, n])
     for i in range(n):
         for j in range(n):
             D[i][i] = A[i][i]
     E = A-D
     Dinv = la.inv(D)
-    B = np.dot(-Dinv,E)
-    z = np.dot(Dinv,b)
+    B = np.dot(-Dinv, E)
+    z = np.dot(Dinv, b)
 
     spec_rad = max(la.svd(B)[1])**2
     if spec_rad >= 1:
-        print('Spectral radius of B (%f) >= 1. Method won\'t converge.' % spec_rad)
-        print('Returning None.')
+        print 'Spectral radius of B (%f) >= 1. Method won\'t converge.' % spec_rad
+        print 'Returning None.'
         return None
     else:
-        print('Spectral radius of B: %f' % spec_rad)
+        print 'Spectral radius of B: %f' % spec_rad
 
-    ## iterations
+    # iterate
     x = x_0
     for i in range(maxiter):
-        x = np.dot(B,x) + z
-        #print(la.norm(np.dot(A,x)-b))
-        if la.norm(np.dot(A,x)-b) <= tol:
+        x = np.dot(B, x) + z
+
+        if la.norm(A.dot(x) - b) <= tol:
             break
 
     return x
@@ -1830,12 +1869,14 @@ def gradient_descent_alt(A, b, x_0=None, x_tru=None, tol=10**-5, numIter=500, re
     assert len(b) == n
 
     # Working with (n, ) vectors, not (n, 1)
-    if len(b.shape) == 2: b = b.reshape(n, )
+    if len(b.shape) == 2: 
+        b = b.reshape(n, )
     if x_0 is None:
         x_0 = np.random.randn(n, )
     else:
         assert len(x_0) == n
-        if len(x_0.shape) == 2: x_0 = x_0.reshape(n, ) # (n, ) over (n, 1)
+        if len(x_0.shape) == 2: 
+            x_0 = x_0.reshape(n, ) # (n, ) over (n, 1)
 
     # diagnostics
     x_hist = []
@@ -1931,7 +1972,8 @@ def gradient_descent_nonsymm(A, b, x_0=None, x_tru=None, tol=10**-5, numIter=500
     assert len(b) == n
 
     # Working with (n, ) vectors, not (n, 1)
-    if len(b.shape) == 2: b = b.reshape(n, )
+    if len(b.shape) == 2: 
+        b = b.reshape(n, )
     if x_0 is None:
         x_0 = np.random.randn(n, )
     else:
@@ -2090,7 +2132,7 @@ def conjugate_gradient_psd(A,b,x_0=None,x_tru=None,tol=10**-3,max_iter=500,recal
     del_new = np.dot(r,r)
     del_0 = np.copy(del_new)
 
-    if full_output == True:
+    if full_output:
         resids = OrderedDict()
         start_time = time.time()
         resids[i] = la.norm(b-np.dot(A,x))
@@ -2115,12 +2157,12 @@ def conjugate_gradient_psd(A,b,x_0=None,x_tru=None,tol=10**-3,max_iter=500,recal
         d = r + beta*d
         i += 1
 
-        if full_output == True:
+        if full_output:
             resids[i] = la.norm(b-np.dot(A,x))
             if x_tru is not None:
                 errs[i] = la.norm(x-x_tru)
 
-    if full_output == True:
+    if full_output:
         resids[i] = la.norm(b-np.dot(A,x))
         if i < max_iter:
             status = True
