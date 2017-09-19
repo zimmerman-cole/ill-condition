@@ -114,7 +114,13 @@ class Problem:
         if self.dim == 1:
             self.f = blur_1d.gen_f(self.n, plot=self.plot)
         elif self.dim == 2:
-            self.f = blur_2d.gen_f_rect(self.n_1, self.n_2, levels=self.levels, plot=self.plot)
+            self.diamond = kwargs.get('diamond', None)
+            if self.diamond is None:
+                self.f = blur_2d.gen_f_rect(self.n_1, self.n_2, levels=self.levels, plot=self.plot)
+            else:
+                self.f = blur_2d.gen_f_diam(plot=self.plot)
+                assert self.n_1 == self.f.shape[0]
+                assert self.n_2 == self.f.shape[1]
         else:
             print('dim > 2 not implemented yet')
             sys.exit(0)
