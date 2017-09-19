@@ -10,6 +10,7 @@ from tomo1D import blur_1d as blur_1d
 from tomo2D import blur_2d as blur_2d
 import tomo2D.drt as drt
 from cvxopt import spmatrix
+import cvxpy as cvx
 
 # not positive-definite
 def mat_from_cond(cond_num, m=50, n=50, min_sing=None):
@@ -526,3 +527,58 @@ def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=T
     b = np.concatenate([np.zeros(n).reshape(n,), b1.reshape(n,), np.zeros(n).reshape(n,)])
 
     return A, b
+
+def extend_ipm_prob(times=1, X=None, M=None, Kb=None, lam=None, sb=None, ZK=True):
+    ## check
+    assert(X is not None and M is not None and Kb is not None and lam is not None and sb is not None)
+
+    ## size
+    m = X.shape[0]
+    n = X.shape[1]
+    n_ext = n*times
+    m_ext = m*times
+
+    ## cleaning
+    sb = sb.reshape(m,)
+
+    ## extend X
+    X_ext = sps.hstack([X for i in range(times)])
+    X_ext = sps.vstack([X_ext for i in range(times)])
+
+    ## extend M
+    M_ext = sps.hstack([M for i in range(times)])
+    M_ext = sps.vstack([M_ext for i in range(times)])
+
+    ## extend Kb and sb
+    Kb_diag = Kb.diagonal()
+    Kb_diag_ext = np.zeros(m_ext)
+    sb_ext = np.zeros(m_ext)
+    for i in range(times):
+        Kb_diag_ext[(i*m):((i+1)*m)] = Kb_diag
+        sb_ext[(i*m):((i+1)*m)] = sb
+    Kb_ext = sps.diags(Kb_diag_ext,0)
+
+    ## cleaning
+    sb_ext = sb_ext.reshape(m*times,1)
+
+    ## compute Z and K cholesky
+    if ZK:
+        Z_ext = (sps.eye(n_ext) - M_ext.T.dot(M_ext)).dot(X_ext.T.dot(X_ext) + lam*sps.eye(n_ext))
+        K_12_ext = sps.spdiags([np.sqrt(x) for x in Kb_diag_ext], diags=0, m=m_ext, n=m_ext)      # cholesky
+        K_12_1_ext = sps.spdiags([1./x for x in K_12_ext.diagonal()], diags=0, m=m_ext, n=m_ext)  # inverse cholesky
+        return X_ext, M_ext, Kb_ext, sb_ext, Z_ext, K_12_ext, K_12_1_ext, n_ext, m_ext
+    else:
+        return X_ext, M_ext, Kb_ext, sb_ext, n_ext, m_ext
+
+def gen_ipm_prob(n=None, K_12=None, K_12_1=None, X=None, Z=None, sb=None, tol=None, niter=None):
+    u = cvx.Variable(n)
+    obj = cvx.Minimize( cvx.norm(K_12*X*u - K_12_1*sb))
+    constr = [Z*u == float(0)]
+    prob = cvx.Problem(obj, constr)
+
+    mosek_params = {'MSK_IPAR_OPTIMIZER':2}  # 2: conic (http://docs.mosek.com/8.0/capi/constants.html#optimizertype)
+    mosek_params['MSK_DPAR_INTPNT_CO_TOL_REL_GAP'] = tol      # doesn't seem to work with `tol` tolerance; breaks at 1e-14
+    mosek_params['MSK_IPAR_INTPNT_MAX_ITERATIONS'] = niter    # doesn't seem to work...
+    mosek_params['MSK_IPAR_PRESOLVE_USE'] = 0 # setting MSK_PRESOLVE_MODE_OFF to off
+
+    return prob, u
