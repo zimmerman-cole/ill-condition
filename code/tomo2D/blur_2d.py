@@ -6,6 +6,7 @@ import scipy.sparse as sps
 from pprint import pprint
 from scipy.stats import norm
 import matplotlib.pyplot as plt
+from skimage import morphology
 
 import os, sys
 sys.path.append('..')
@@ -50,6 +51,26 @@ def gen_f_rect(n_1, n_2, levels=3, save=False, plot=True):
         plt.title("f_rect image")
         plt.show()
     return(f_rect)
+
+def gen_f_diam(plot=True):
+    # TODO: make general for n_1, n_2, d; now only tries to mimic Sean's
+    """
+    Generates rectangular image f with `diamond` shape
+    Args:
+        - n_1: n rows
+        - n_2: n cols
+        - d: width/height of diamong shape
+    Returns:
+        - f_rect: image with d-by-d diamond
+    """
+    f = morphology.diamond(8)
+    f = np.pad(f, pad_width=(27,26), mode='constant', constant_values=(0, 0))
+    f = f[18:53]
+    if plot:
+        plt.imshow(f)
+        plt.show()
+    return f
+
 
 # f = gen_f_rect(100, 200, levels=10, save=True)
 

@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 
 np.set_printoptions(linewidth=200)
 
-def gen_f(n, save=False, plot=True):
-    f_impulse = np.array([50 if (0.4*n)<=i and i<(0.6*n) else 0 for i in range(n)])
+def gen_f(n, save=False, p1=0.4, p2=0.6, plot=True):
+    f_impulse = np.array([50 if (p1*n)<=i and i<(p2*n) else 0 for i in range(n)])
     if save:
         name = "f_impulse"+"_"+str(n)
         np.save(name,f_impulse)
