@@ -489,10 +489,10 @@ def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=T
     C = Z.dot(sps.eye(n) - M.T.dot(M))
     if sparse:
         if Kb_is_diag:
-            K_12 = sps.spdiags([np.lib.scimath.sqrt(x) for x in Kb.diagonal()], diags=0, m=n, n=n)
+            K_12 = sps.spdiags([np.lib.scimath.sqrt(x) for x in Kb.diagonal()], diags=0, m=m, n=m)
         else:
             lu = spsla.splu(Kb)
-            D_12 = sps.spdiags([np.lib.scimath.sqrt(x) for x in np.diag(lu.U.A)], diags=0, m=n, n=n)
+            D_12 = sps.spdiags([np.lib.scimath.sqrt(x) for x in np.diag(lu.U.A)], diags=0, m=m, n=m)
             L = lu.L
             L_permuted = L.dot(D_12)
             Pr = sps.csc_matrix((n, n))
@@ -500,15 +500,16 @@ def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=T
             Pr[lu.perm_r, np.arange(n)] = 1
             Pc[np.arange(n), lu.perm_c] = 1
             K_12 = Pr.T.dot(L_unarranged).dot(Pc.T)
-        Q = X.dot(K_12)
-        A22 = -sps.eye(n)
+        A22 = -sps.eye(m)
     else:
         if Kb_is_diag:
-            K_12 = np.diag([np.lib.scimath.sqrt(x) for x in np.diag(Kb)], diags=0, m=n, n=n)
+            K_12 = np.diag([np.lib.scimath.sqrt(x) for x in np.diag(Kb)], diags=0, m=m, n=m)
         else:
             K_12 = la.cholesky(Kb)
-        Q = X.dot(K_12)
-        A22 = -np.eye(n)
+        A22 = -np.eye(m)
+
+    ## intermediate calc
+    Q = K_12.dot(X)
 
     ## block LHS
     A11 = None
@@ -524,7 +525,7 @@ def gen_ESI3_system(X=None, Kb=None, B=None, M=None, lam=None, sb=None, sparse=T
 
     ## block RHS
     b1 = X.T.dot(sb)
-    b = np.concatenate([np.zeros(n).reshape(n,), b1.reshape(n,), np.zeros(n).reshape(n,)])
+    b = np.concatenate([b1.reshape(n,), np.zeros(m).reshape(m,), np.zeros(n).reshape(n,)])
 
     return A, b
 
