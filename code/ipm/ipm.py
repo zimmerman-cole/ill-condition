@@ -18,10 +18,10 @@ def ipm(x0=None, s0=None, y0=None, z0=None, \
     err = 1e6
 
     ## prepare for iterations
-    x = x0
-    s = s0
-    y = y0
-    z = z0
+    x = np.array(x0).reshape(5,1)
+    s = np.array(s0).reshape(2,1)
+    y = np.array(y0).reshape(3,1)
+    z = np.array(z0).reshape(2,1)
     mu = mu0
 
     ## solve interior Newton systems
@@ -39,11 +39,13 @@ def ipm(x0=None, s0=None, y0=None, z0=None, \
 
             ## setup and solve Newton System
             h, J = util.nt_sys(x, s, y, z, mu)
-            p = la.solve(J,-h)
-            p_x = p[0:5]
-            p_s = p[5:7]
-            p_y = p[7:10]
-            p_z = p[10:12]
+            # print(type(h[0]), type(h))
+            print(type(J[0][0]), type(J))
+            p = la.solve(J,h)
+            p_x = np.array(p[0:5]).reshape(5,1)
+            p_s = np.array(p[5:7]).reshape(2,1)
+            p_y = np.array(p[7:10]).reshape(3,1)
+            p_z = np.array(p[10:12]).reshape(2,1)
 
             ## step length
             a = np.linspace(0.,1., 100)
@@ -53,6 +55,8 @@ def ipm(x0=None, s0=None, y0=None, z0=None, \
             a_z = a_z.x
 
             ## updates
+            # print('p_x', p_x, type(p_x), p_x.shape)
+            # print('x', x, type(x), x.shape)
             x += a_s*p_x
             s += a_s*p_s[0]
             y += a_z*p_y
