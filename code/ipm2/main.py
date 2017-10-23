@@ -2,14 +2,14 @@ import numpy as np
 import numpy.linalg as la
 import util
 
-def ipm(x0=None, s0=None, z0=None, mu=None, tau=None, K=20, debug=True):
+def ipm(x0=None, s0=None, z0=None, y0=None, mu=None, tau=None, K=20, debug=True):
     ## initialize
-    if x0 is None: x0 = np.array([2.,3.])
-    if s0 is None: s0 = np.array([0.5,0.5])
-    if z0 is None: z0 = np.array([1.,1.])
+    if x0 is None: x0 = np.array([2., 3.])
+    if s0 is None: s0 = np.array([6.,13.])
+    if z0 is None: z0 = np.array([-0.4053, -0.3052])
     if mu is None: mu = 10.
     if tau is None: tau = 0.99
-    x, s, z = x0, s0, z0
+    x, s, z, y= x0, s0, z0, y0
     x = x.reshape(2,1)
     s = s.reshape(2,1)
     z = z.reshape(2,1)
@@ -59,11 +59,26 @@ def ipm(x0=None, s0=None, z0=None, mu=None, tau=None, K=20, debug=True):
 
         if debug:
             print("error: {:f}".format(err))
+            print
 
         if err < mu:
-            if debug: print("x: {:s}".format(x))
+            if debug:
+                print("x: {:s}".format(x))
+                print("f(x): {:s}".format(util.f0(x)))
+
             return x
-    if debug: print("x: {:s}".format(x))
+    if debug:
+        print("x:    {:s}".format(x))
+        print("f(x): {:s}".format(util.f0(x)))
+        print("s1:   {:s}".format(s[0]))
+        print("s2:   {:s}".format(s[1]))
+        print("z1:   {:s}".format(z[0]))
+        print("z2:   {:s}\n".format(z[1]))
+        print('___________________________')
+        print("x*:   {:s}".format([4.3198, 1.1575]))
+        print("s*:   {:s}".format([5., 20.]))
+        print("z*:   {:s}".format([2.2470, 0.1671]))
+
     return x
 
 if __name__ == '__main__':
