@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as la
+np.set_printoptions(precision=2, linewidth=80)
 
 def f0(x):
     return x[1] * (5.+x[0])
@@ -88,8 +89,9 @@ def F(x, s, z, mu, componentwise=False, debug=False):
                     con])
 
     if debug:
-        print("F:")
-        print(out)
+        print("    F:")
+        print("\t" + str(out).replace('\n','\n\t'))
+        print("\n")
 
     if componentwise:
         return lag, slk, con, out
@@ -131,8 +133,9 @@ def JF(x, s, z, mu, debug=False):
                    [j31, j32, j33]])
 
     if debug:
-        print("JF:")
-        print(out)
+        print("    JF:")
+        print("\t" + str(out).replace('\n','\n\t'))
+        print("\n")
 
     return out
 

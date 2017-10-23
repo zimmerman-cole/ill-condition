@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as la
 import util
 
-def ipm(x0=None, s0=None, z0=None, y0=None, mu=None, tau=None, K=20, debug=True):
+def ipm(x0=None, s0=None, z0=None, y0=None, mu=None, tau=None, K=2, debug=True):
     ## initialize
     if x0 is None: x0 = np.array([2., 3.])
     if s0 is None: s0 = np.array([6.,13.])
@@ -16,69 +16,43 @@ def ipm(x0=None, s0=None, z0=None, y0=None, mu=None, tau=None, K=20, debug=True)
     err = 1e6
 
     for k in range(K):
-        i = 0
-        print("=== iter {:d} ===================================================\n".format(k))
+        print("=== iter {:d} ==================================================================".format(k))
+        if debug:
+            print("f(x): {:s}\n".format(util.f0(x)))
+            print("x: {:s}\n".format(x.T))
+            print("s: {:s}\n".format(s.T))
+            print("z: {:s}\n".format(z.T))
+
+        ## setup system
+        print("    --- system ---------------------------------------------------------------\n")
         JF = util.JF(x, s, z, mu, debug=debug)
         F = util.F(x, s, z, mu, debug=debug)
-        p = la.solve(JF, -F)
+
+        ## solve system
+        p = la.solve(JF, F)
         p_x, p_s, p_z = np.split(p, 3)
+        print("    --- system ---------------------------------------------------------------\n")
 
-        ## line search
-        alpha = 1.
-        new_err = err
-        while new_err >= err:
-            print("    --- inner iteration: {:d} ---------------------------\n".format(i))
-            xx = x + alpha*p_x
-            ss = s + alpha*p_s
-            zz = z + alpha*p_z
-            new_err = util.calc_err(xx, ss, zz, mu, debug=debug)
-            i += 1
-            alpha *= tau
+        ## update
+        x += p_x
+        s += p_s
+        z += p_z
 
         if debug:
-            print("p:")
-            print(p)
-
-        if debug > 1:
-            print("shape of JF: ({:d},{:d})".format(JF.shape[0], JF.shape[1]))
-            print("shape of F: ({:d},{:d})".format(F.shape[0], F.shape[1]))
-            print("shape of p: ({:d},{:d})".format(p.shape[0], p.shape[1]))
-
-
-        if debug > 1:
-            print("shape of p: ({:d},{:d})".format(p.shape[0], p.shape[1]))
-            print("shape of p_x: ({:d},{:d})".format(p_x.shape[0], p_x.shape[1]))
-            print("shape of p_s: ({:d},{:d})".format(p_s.shape[0], p_s.shape[1]))
-            print("shape of p_z: ({:d},{:d})".format(p_z.shape[0], p_z.shape[1]))
-
-        ## updates
-        x += alpha*p_x.reshape(2,1)
-        s += alpha*p_s.reshape(2,1)
-        z += alpha*p_z.reshape(2,1)
-        err = util.calc_err(x, s, z, mu, debug=debug)
-
-        if debug:
-            print("error: {:f}".format(err))
-            print
-
-        if err < mu:
-            if debug:
-                print("x: {:s}".format(x))
-                print("f(x): {:s}".format(util.f0(x)))
-
-            return x
-    if debug:
-        print("x:    {:s}".format(x))
-        print("f(x): {:s}".format(util.f0(x)))
-        print("s1:   {:s}".format(s[0]))
-        print("s2:   {:s}".format(s[1]))
-        print("z1:   {:s}".format(z[0]))
-        print("z2:   {:s}\n".format(z[1]))
-        print('___________________________')
-        print("x*:   {:s}".format([4.3198, 1.1575]))
-        print("s*:   {:s}".format([5., 20.]))
-        print("z*:   {:s}".format([2.2470, 0.1671]))
-
+            print("~~~ computed direction! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("p_x: {:s}\n".format(p_x.T))
+            print("p_s: {:s}\n".format(p_s.T))
+            print("p_z: {:s}\n".format(p_z.T))
+            print("~~~ updated variables! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("x: {:s}\n".format(x.T))
+            print("s: {:s}\n".format(s.T))
+            print("z: {:s}\n".format(z.T))
+            print("f(x): {:s}".format(util.f0(x)))
+            print("~~~ compare to optimal! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            print("x*:   {:s}".format([4.3198, 1.1575]))
+            print("s*:   {:s}".format([5., 20.]))
+            print("z*:   {:s}".format([2.2470, 0.1671]))
+        print("=== iter {:d} ==================================================================\n".format(k))
     return x
 
 if __name__ == '__main__':
