@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as la
+import matplotlib.pyplot as plt
 np.set_printoptions(precision=2, linewidth=80)
 
 ## ===== primary ===============================================================
@@ -8,6 +9,12 @@ def f(x):
     obj function
     """
     x1, x2 = x[0], x[1]
+    return x1**4 - 2.*(x2 * x1**2) + x2**2 + x1**2 - 2.*x1 + 5.
+
+def fp(x1, x2):
+    """
+    obj function (for plotting)
+    """
     return x1**4 - 2.*(x2 * x1**2) + x2**2 + x1**2 - 2.*x1 + 5.
 
 def g(x):
@@ -93,9 +100,9 @@ def fun_status(x, s, lam, mu):
     print("----- rootfinding -------------------------")
     print("    F = \n{:s}".format(F(x, s, lam, mu)))
     print("    JF = \n{:s}".format(J_F(x, s, lam, mu)))
-    print("----- rootfinding -------------------------\n")
+    print("----- rootfinding -------------------------")
 
-def merit_status(x, s, lam, mu):
+def status(x, s, lam, mu):
     print("----- point -------------------------------")
     print("    x = {:s}".format(x.T))
     print("    s = {:s}".format(s))
@@ -105,7 +112,32 @@ def merit_status(x, s, lam, mu):
     print("    obj = {:s}".format(F_1(x, lam).T))
     print("    slack = {:s}".format(F_2(s, lam, mu)))
     print("    constr = {:s}".format(F_3(x, s)))
-    print("----- residual ----------------------------\n")
+    print("----- residual ----------------------------")
+
+def visualize(xs, ss, lams):
+
+    print(xs)
+    ## initialize contours
+    delta = 0.025
+    x1 = np.arange(-3.0, 3.0, delta)
+    x2 = np.arange(-5.0, 10.0, delta)
+    levels = range(4,11)
+    levels += [15, 20, 25, 30]
+    X1, X2 = np.meshgrid(x1,x2)
+    Y = fp(X1, X2)
+
+    ## initialize figure
+    plt.figure()
+
+    ## plot contours
+    CS = plt.contour(X1, X2, Y, levels=levels)
+    plt.clabel(CS, inline=1, fontsize=10)
+
+    ## plot path
+    plt.plot([xx[0] for xx in xs], [xx[1] for xx in xs], marker="X", label="central path")
+    plt.legend()
+    plt.title("path")
+    plt.show()
 ## ===== other =================================================================
 
 ## ===== rootfinding ===========================================================
@@ -163,4 +195,17 @@ def J_F(x, s, lam, mu):
                    [JF21, JF22, JF23],
                    [JF31, JF32, JF33]])
     return out
+
+def update(x, s, lam, p):
+    p = p.reshape(len(p),)
+    px = p[0:2]
+    px = px.reshape(2,1)
+    ps = p[2:3]
+    ps = ps.reshape(1,)
+    plam = p[3:]
+    plam = plam.reshape(1,)
+    x += px
+    s += ps
+    lam += plam
+    return x, s, lam
 ## ===== rootfinding ===========================================================
