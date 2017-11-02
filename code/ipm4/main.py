@@ -9,11 +9,13 @@ import util
 def ipm(x=None, s=None, lam=None, mu=None, K=10, d=5., show=True):
     ## initialize
     x, s, lam, mu = util.parse_input(x, s, lam, mu)
-    xs, ss, lams = [], [], []
+    xs, ss, lams, ms = [], [], [], []
+    F = util.F(x, s, lam, mu)
     if show:
         xs.append(np.copy(x))
         ss.append(np.copy(s))
         lams.append(np.copy(lam))
+        ms.append(la.norm(F,2))
 
     print("================================================")
     print("===== at initialization ========================")
@@ -36,6 +38,7 @@ def ipm(x=None, s=None, lam=None, mu=None, K=10, d=5., show=True):
             xs.append(np.copy(x))
             ss.append(np.copy(s))
             lams.append(np.copy(lam))
+            ms.append(la.norm(F,2))
         mu /= d
         print("===== end iter {:d} ===============================\n".format(k))
 
@@ -46,7 +49,7 @@ def ipm(x=None, s=None, lam=None, mu=None, K=10, d=5., show=True):
     print("================================================")
 
     if show:
-        util.visualize(xs, ss, lams)
+        util.visualize(xs, ss, lams, ms)
 
 if __name__ == '__main__':
     x = [-1., 4.]

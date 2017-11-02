@@ -114,7 +114,7 @@ def status(x, s, lam, mu):
     print("    constr = {:s}".format(F_3(x, s)))
     print("----- residual ----------------------------")
 
-def visualize(xs, ss, lams):
+def visualize(xs, ss, lams, ms):
     ## initialize contours
     delta = 0.025
     x1 = np.arange(-3.0, 3.0, delta)
@@ -124,7 +124,7 @@ def visualize(xs, ss, lams):
     X1, X2 = np.meshgrid(x1,x2)
     Y = fp(X1, X2)
 
-    plt.figure()
+    fig = plt.figure()
 
     ## initialize path subplot
     plt.subplot(211)
@@ -138,15 +138,26 @@ def visualize(xs, ss, lams):
     # for i in range(len(xs)):
     #     plt.annotate("(s={:s}, lam={:s})".format(ss[i], lams[i]), xy=(xs[i][0], xs[i][1]), textcoords='data')
     plt.legend()
+    plt.xlabel("x1")
+    plt.ylabel("x2")
     plt.title("path")
 
     ## initialize path subplot
-    plt.subplot(212)
-    plt.plot(ss, label="s")
-    plt.plot(lams, label="lam")
+    ax = plt.subplot(212)
+    ax.plot(ss, label="s")
+    ax.plot(lams, label="lam")
     plt.legend()
-    plt.title("s and lambda")
+    plt.xlabel("iteration")
+    plt.ylabel("s or lam value")
+    axx = ax.twinx()
+    axx.semilogy(ms, label="merit", color='red')
+    plt.legend(loc=2)
+    plt.ylabel("merit")
+    plt.title("s, lambda, and merit")
+
+    plt.tight_layout()
     plt.show()
+    fig.savefig("output/cp.pdf")
 ## ===== other =================================================================
 
 ## ===== rootfinding ===========================================================
