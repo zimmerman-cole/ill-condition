@@ -2,6 +2,9 @@ import numpy as np
 import numpy.linalg as la
 import matplotlib.pyplot as plt
 import util
+## =============================================================================
+## reference: http://apmonitor.com/me575/index.php/Main/BookChapters
+## =============================================================================
 
 def ipm(x=None, s=None, lam=None, mu=None, K=10, d=5., show=True):
     ## initialize

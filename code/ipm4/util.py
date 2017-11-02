@@ -115,8 +115,6 @@ def status(x, s, lam, mu):
     print("----- residual ----------------------------")
 
 def visualize(xs, ss, lams):
-
-    print(xs)
     ## initialize contours
     delta = 0.025
     x1 = np.arange(-3.0, 3.0, delta)
@@ -135,6 +133,9 @@ def visualize(xs, ss, lams):
 
     ## plot path
     plt.plot([xx[0] for xx in xs], [xx[1] for xx in xs], marker="X", label="central path")
+    for i in range(len(xs)):
+        plt.annotate("(s={:s}, lam={:s})".format(ss[i], lams[i]), xy=(xs[i][0], xs[i][1]), textcoords='data')
+
     plt.legend()
     plt.title("path")
     plt.show()
