@@ -6,7 +6,7 @@ import util
 ## reference: http://apmonitor.com/me575/index.php/Main/BookChapters
 ## =============================================================================
 
-def ipm(x=None, s=None, lam=None, mu=None, K=10, d=5., show=True):
+def ipm(x=None, s=None, lam=None, mu=None, K=8, d=5., show=True):
     ## initialize
     x, s, lam, mu = util.parse_input(x, s, lam, mu)
     xs, ss, lams, ms = [], [], [], []
@@ -21,7 +21,7 @@ def ipm(x=None, s=None, lam=None, mu=None, K=10, d=5., show=True):
     print("===== at initialization ========================")
     util.fun_status(x, s, lam, mu)
     print("===== at initialization ========================")
-    print("================================================")
+    print("================================================\n")
 
     for k in range(K):
         print("===== start iter {:d} =============================".format(k))
@@ -33,7 +33,8 @@ def ipm(x=None, s=None, lam=None, mu=None, K=10, d=5., show=True):
         p = la.solve(J_F, -F)
 
         ## update
-        x, s, lam = util.update(x, s, lam, p)
+        x, s, lam = util.step(x, s, lam, p)
+
         if show:
             xs.append(np.copy(x))
             ss.append(np.copy(s))

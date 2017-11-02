@@ -133,8 +133,9 @@ def visualize(xs, ss, lams, ms):
     CS = plt.contour(X1, X2, Y, levels=levels)
     plt.clabel(CS, inline=1, fontsize=10)
 
-    ## path
+    ## path & constraint
     plt.plot([xx[0] for xx in xs], [xx[1] for xx in xs], marker="X", label="central path")
+    plt.plot(x1, (x1 + 0.25)**2/0.75, label="constraint")
     # for i in range(len(xs)):
     #     plt.annotate("(s={:s}, lam={:s})".format(ss[i], lams[i]), xy=(xs[i][0], xs[i][1]), textcoords='data')
     plt.legend()
@@ -215,7 +216,9 @@ def J_F(x, s, lam, mu):
                    [JF21, JF22, JF23],
                    [JF31, JF32, JF33]])
     return out
+## ===== rootfinding ===========================================================
 
+## ===== merit / step ==========================================================
 def update(x, s, lam, p):
     p = p.reshape(len(p),)
     px = p[0:2]
@@ -228,4 +231,20 @@ def update(x, s, lam, p):
     s += ps
     lam += plam
     return x, s, lam
-## ===== rootfinding ===========================================================
+
+def step(x, s, lam, p):
+    # a = la.norm(F_1(x, lam), 2)
+    # b = la.norm(F_2(s, lam, mu), 2)
+    # c = la.norm(F_3(x, s), 2)
+    # d = -s
+    # e = -lam
+    alpha = 1
+    i = 0
+    xx, ss, lamlam = update(np.copy(x), np.copy(s), np.copy(lam), np.copy(p))
+    while (ss < 0  or lamlam < 0) and i < 1000:
+        alpha *= 0.9
+        xx, ss, lamlam = update(x, s, lam, alpha*p)
+        i += 1
+    if i > 1000:
+        print("warning")
+    return xx, ss, lamlam
