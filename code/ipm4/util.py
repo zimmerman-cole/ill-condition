@@ -124,20 +124,28 @@ def visualize(xs, ss, lams):
     X1, X2 = np.meshgrid(x1,x2)
     Y = fp(X1, X2)
 
-    ## initialize figure
     plt.figure()
 
-    ## plot contours
+    ## initialize path subplot
+    plt.subplot(211)
+
+    ## contours
     CS = plt.contour(X1, X2, Y, levels=levels)
     plt.clabel(CS, inline=1, fontsize=10)
 
-    ## plot path
+    ## path
     plt.plot([xx[0] for xx in xs], [xx[1] for xx in xs], marker="X", label="central path")
-    for i in range(len(xs)):
-        plt.annotate("(s={:s}, lam={:s})".format(ss[i], lams[i]), xy=(xs[i][0], xs[i][1]), textcoords='data')
-
+    # for i in range(len(xs)):
+    #     plt.annotate("(s={:s}, lam={:s})".format(ss[i], lams[i]), xy=(xs[i][0], xs[i][1]), textcoords='data')
     plt.legend()
     plt.title("path")
+
+    ## initialize path subplot
+    plt.subplot(212)
+    plt.plot(ss, label="s")
+    plt.plot(lams, label="lam")
+    plt.legend()
+    plt.title("s and lambda")
     plt.show()
 ## ===== other =================================================================
 
