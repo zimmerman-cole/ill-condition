@@ -1,5 +1,7 @@
 import numpy as np
 import numpy.linalg as la
+import scipy
+from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 np.set_printoptions(precision=2, linewidth=80)
 
@@ -114,10 +116,10 @@ def status(x, s, lam, mu):
     print("    constr = {:s}".format(F_3(x, s)))
     print("----- residual ----------------------------")
 
-def visualize(xs, ss, lams, ms):
+def visualize(xs, ss, lams, ms, xs_cp, mu):
     ## initialize contours
     delta = 0.025
-    x1 = np.arange(-3.0, 3.0, delta)
+    x1 = np.arange(-2.0, 2.0, delta)
     x2 = np.arange(-5.0, 10.0, delta)
     levels = range(4,11)
     levels += [15, 20, 25, 30]
@@ -130,35 +132,36 @@ def visualize(xs, ss, lams, ms):
     plt.subplot(211)
 
     ## contours
-    CS = plt.contour(X1, X2, Y, levels=levels)
+    CS = plt.contour(X1, X2, Y, levels=levels, linewidths=0.5)
     plt.clabel(CS, inline=1, fontsize=10)
 
-    ## path & constraint
-    plt.plot([xx[0] for xx in xs], [xx[1] for xx in xs], marker="X", label="central path")
-    plt.plot(x1, (x1 + 0.25)**2/0.75, label="constraint")
+    ## path & constraint & full step
+    plt.plot([xx[0] for xx in xs], [xx[1] for xx in xs], marker=".", label="cp_ntn", linewidth=0.5, markersize=3)
+    plt.plot([xx[0] for xx in xs_cp], [xx[1] for xx in xs_cp], marker=".", label="cp_num", linewidth=0.5, markersize=3)
+    plt.plot(x1, (x1 + 0.25)**2/0.75, label="const = 0", linewidth=0.5, color="red")
     # for i in range(len(xs)):
     #     plt.annotate("(s={:s}, lam={:s})".format(ss[i], lams[i]), xy=(xs[i][0], xs[i][1]), textcoords='data')
-    plt.legend()
+    plt.legend(fontsize=5)
     plt.xlabel("x1")
     plt.ylabel("x2")
     plt.title("path")
 
     ## initialize path subplot
     ax = plt.subplot(212)
-    ax.plot(ss, label="s")
-    ax.plot(lams, label="lam")
-    plt.legend()
+    ax.semilogy(ss, label="slacks", linewidth=0.5)
+    ax.semilogy(ms, label="merits", linewidth=0.5)
+    plt.legend(loc=2, fontsize=5)
     plt.xlabel("iteration")
-    plt.ylabel("s or lam value")
+    plt.ylabel("s or merit value")
     axx = ax.twinx()
-    axx.semilogy(ms, label="merit", color='red')
-    plt.legend(loc=2)
-    plt.ylabel("merit")
+    axx.plot(lams, label="duals", color='red', linewidth=0.5)
+    plt.legend(loc=1, fontsize=5)
+    plt.ylabel("dual")
     plt.title("s, lambda, and merit")
 
     plt.tight_layout()
     plt.show()
-    fig.savefig("output/cp.pdf")
+    fig.savefig("output/cp_m{:0.1f}_x1={:0.1f}_x2={:0.1f}.pdf".format(mu, xs[0][0][0], xs[0][1][0]))
 ## ===== other =================================================================
 
 ## ===== rootfinding ===========================================================
@@ -248,3 +251,34 @@ def step(x, s, lam, p):
     if i > 1000:
         print("warning")
     return xx, ss, lamlam
+## ===== merit / step ==========================================================
+
+## ===== scipy optim ===========================================================
+def constraint(x):
+    x1, x2 = x[0], x[1]
+    return -(x1 + 0.25)**2 + 0.75*x2
+
+def objective(x, mu):
+    x1, x2 = x[0], x[1]
+    return x1**4 - 2.*(x2 * x1**2) + x2**2 + x1**2 - 2.*x1 + 5. - mu*np.log(constraint(x))
+
+def get_cp(x, mu):
+    n = 2
+    b = (-10.0, 10.0)
+    bnds = (b, b)
+    con = {'type': 'ineq', 'fun': constraint}
+    cons = ([con])
+    solution = minimize(objective, x, args=mu, method='SLSQP',\
+                        bounds=bnds, constraints=cons)
+    x = solution.x
+
+    # show final objective
+    print('Final SSE Objective: ' + str(objective(x, mu)))
+    # print solution
+    print('Solution')
+    print('x1 = ' + str(x[0]))
+    print('x2 = ' + str(x[1]))
+
+    return x
+
+## ===== scipy optim ===========================================================

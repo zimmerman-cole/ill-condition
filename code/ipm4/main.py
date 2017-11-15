@@ -9,13 +9,16 @@ import util
 def ipm(x=None, s=None, lam=None, mu=None, K=8, d=5., show=True):
     ## initialize
     x, s, lam, mu = util.parse_input(x, s, lam, mu)
+    mu0 = mu
     xs, ss, lams, ms = [], [], [], []
+    xs_cp = []
     F = util.F(x, s, lam, mu)
     if show:
         xs.append(np.copy(x))
         ss.append(np.copy(s))
         lams.append(np.copy(lam))
         ms.append(la.norm(F,2))
+        xs_cp.append(np.copy(x))
 
     print("================================================")
     print("===== at initialization ========================")
@@ -32,7 +35,12 @@ def ipm(x=None, s=None, lam=None, mu=None, K=8, d=5., show=True):
         J_F = util.J_F(x, s, lam, mu)
         p = la.solve(J_F, -F)
 
-        ## update
+        ## update with full step for tracking
+        if show:
+            x_cp = util.get_cp(np.copy(x), np.copy(mu))
+            xs_cp.append(x_cp)
+
+        ## update and step
         x, s, lam = util.step(x, s, lam, p)
 
         if show:
@@ -46,15 +54,19 @@ def ipm(x=None, s=None, lam=None, mu=None, K=8, d=5., show=True):
     print("================================================")
     print("===== upon completion ==========================")
     util.fun_status(x, s, lam, mu)
+    print("------------------------------------------------")
+    if show:
+        print("    x_nt = {:s}".format(xs[-1].T))
+        print("    x_cp = {:s}".format(xs_cp[-1]))
     print("===== upon completion ==========================")
     print("================================================")
 
     if show:
-        util.visualize(xs, ss, lams, ms)
+        util.visualize(xs, ss, lams, ms, xs_cp, mu0)
 
 if __name__ == '__main__':
-    x = [-1., 4.]
+    x = [-1., 10.]
     s = 2.4375
     lam = 2
-    mu = 5
-    ipm(x=x, s=s, lam=lam, mu=mu)
+    mu = 50
+    ipm(x=x, s=s, lam=lam, mu=mu, K=10)
