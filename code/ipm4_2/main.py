@@ -65,10 +65,38 @@ def ipm(x=None, s=None, lam=None, mu=None, K=8, d=5., show=True):
 
     if show:
         util.visualize(xs, ss, lams, ms, xs_cp, mu0)
+        return xs, ss, lams, ms, xs_cp, mu0
+    return xs, ss, lams, ms
+
+def simulate(x0=None, mu0=None, lam0=None, s0=None, K=10):
+    N = len(x0)
+    if len(mu0) < N:
+        mu0 = np.repeat(mu0, N)
+    if len(lam0) < N:
+        lam0 = np.repeat(lam0, N)
+    if len(mu0) < N:
+        s0 = np.repeat(s0, N)
+    xss, sss, lamss, mss, xss_cp, mu0s = [], [], [], [], [], []
+    for i in range(len(x0)):
+        xs, ss, lams, ms, xs_cp, mu00 = ipm(x=x0[i], s=s0[i], lam=lam0[i], mu=mu0[i], K=K)
+        xss.append(xs)
+        sss.append(ss)
+        lamss.append(lams)
+        mss.append(ms)
+        xss_cp.append(xs_cp)
+        mu0s.append(mu00)
+    util.visualize_sims(xss, sss, lamss, mss, xss_cp, mu0s)
+
 
 if __name__ == '__main__':
-    x = [-3., 12.]
-    s = 2.4375
-    lam = 2
-    mu = 50
-    ipm(x=x, s=s, lam=lam, mu=mu, K=10)
+    # x = [-1., 10.]
+    # s = 2.4375
+    # lam = 2
+    # mu = 50
+    # ipm(x=x, s=s, lam=lam, mu=mu, K=10)
+
+    x0 = [[-1.,10.], [-1.,10.]]
+    s0 = [2.4375, 2.4375]
+    lam0 = [2., 2.]
+    mu0 = [20, 100]
+    simulate(x0=x0, mu0=mu0, lam0=lam0, s0=s0)
