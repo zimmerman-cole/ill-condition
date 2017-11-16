@@ -165,7 +165,7 @@ def visualize(xs, ss, lams, ms, xs_cp, mu):
 
 def visualize_sims(xss, sss, lamss, mss, xss_cp, mus):
     ## initialize colors
-    c = ['orange', 'green', 'blue', 'purple']
+    c = ['orange', 'yellow', 'green', 'blue', 'purple']
 
     ## initialize contours
     delta = 0.025
@@ -206,6 +206,7 @@ def visualize_sims(xss, sss, lamss, mss, xss_cp, mus):
     for i in range(len(xss)):
         ss = sss[i]
         ms = mss[i]
+        mu = mus[i]
         ax.semilogy(ss, linewidth=0.5, color=c[i])
         ax.semilogy(ms, linewidth=0.5, color=c[i], alpha=0.6)
         ax.plot([], [], label="mu0={:0.1f}".format(mu), color=c[i])
@@ -216,9 +217,9 @@ def visualize_sims(xss, sss, lamss, mss, xss_cp, mus):
     for i in range(len(xss)):
         lams = lamss[i]
         axx.plot(lams, linewidth=0.5, color=c[i], alpha=0.3)
-    plt.plot([], [], label="slack".format(mu), color="black", alpha=1)
-    plt.plot([], [], label="merit".format(mu), color="black", alpha=0.6)
-    plt.plot([], [], label="dual".format(mu), color="black", alpha=0.3)
+    plt.plot([], [], label="slack", color="black", alpha=1)
+    plt.plot([], [], label="merit", color="black", alpha=0.6)
+    plt.plot([], [], label="dual", color="black", alpha=0.3)
     plt.legend(loc=1, fontsize=5)
     plt.ylabel("dual")
     plt.title("s, lambda, and merit")
