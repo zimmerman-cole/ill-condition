@@ -57,7 +57,9 @@ def ipm(x=None, s=None, lam=None, mu=None, K=8, d=5., show=True):
     print("------------------------------------------------")
     if show:
         print("    x_nt = {:s}".format(xs[-1].T))
+        print("    f(x_nt) = {:s}".format(util.f(xs[-1])))
         print("    x_cp = {:s}".format(xs_cp[-1]))
+        print("    f(x_cp) = {:0.2f}".format(util.f(xs_cp[-1])))
     print("===== upon completion ==========================")
     print("================================================")
 
