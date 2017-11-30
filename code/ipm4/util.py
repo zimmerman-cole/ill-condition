@@ -163,6 +163,15 @@ def visualize(xs, ss, lams, ms, xs_cp, mu):
     plt.show()
     fig.savefig("output/cp_m{:0.1f}_x1={:0.1f}_x2={:0.1f}.pdf".format(mu, xs[0][0][0], xs[0][1][0]))
 
+    ## error plot
+    fig = plt.figure()
+    plt.subplot(111)
+    plt.semilogy([la.norm(xs[i] - xs_cp[-1]) for i in range(len(xs)-1)], label="IPM err")
+    plt.semilogy([la.norm(xs_cp[i] - xs_cp[-1]) for i in range(len(xs)-1)], label="CP err")
+    plt.legend()
+    plt.show()
+    fig.savefig("output/ERRORS_cp_m{:0.1f}_x1={:0.1f}_x2={:0.1f}.pdf".format(mu, xs[0][0][0], xs[0][1][0]))
+
 def visualize_sims(xss, sss, lamss, mss, xss_cp, mus):
     ## initialize colors
     c = ['orange', 'yellow', 'green', 'blue', 'purple']
