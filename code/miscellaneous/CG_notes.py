@@ -8,6 +8,36 @@ import sys
 sys.path.append('..')
 import util, pprint
 import optimize
+from itertools import chain
+
+def coord_descent(A,b,x_0, tol=1e-3, max_iter=10, dirn=0):
+    err = np.inf
+    iter = 1
+    x = np.copy(x_0)
+    n = len(x)
+    x_true = la.inv(A).dot(b)
+    xs = [x_0]
+    def f(x):
+        return(0.5*x.T.dot(A.dot(x)) - b.T.dot(x))
+    def fprime(x):
+        g = A.dot(x) - b
+        return g
+
+    while(err > tol and iter < max_iter):
+        if dirn==0:
+            idx = range(n)
+        else:
+            idx = range(n-1,-1,-1)
+        for k in idx:
+            gk = np.zeros(n)
+            g = b - A.dot(x)
+            gk[k] = g[k]
+            alpha, _, _, _, _, _ = scipy.optimize.line_search(f, fprime, x, gk)
+            x += alpha*gk
+            xs.append(np.copy(x))
+        err = la.norm(x-x_true)
+        iter += 1
+    return x, xs
 
 def norm_dif(x, *args):
     """
@@ -267,9 +297,10 @@ def plot_errs(name, errs, span, scheme=0, space="x"):
     plt.legend()
 
 def vis_2x2():
-    A = np.asarray([[4., 0.],[0., 1.]])
+    A = np.asarray([[4., 2.],[1., 1.]])
     b = np.ones(2)
     x_true = la.inv(A).dot(b)
+    print(x_true)
     x_0 = np.asarray([1., 5.])
 
     ## solver object
@@ -277,10 +308,13 @@ def vis_2x2():
     s_cg = optimize.ConjugateGradientsSolver(A=A,b=b,full_output=True)
 
     ## paths
+    err = [x_0,x_true]
     path_gd = s_gd.path(x_0=x_0)
     path_cg = s_cg.path(x_0=x_0)
-    path_diag1 = [x_0, np.array([x_0[0],0]), x_true]
-    path_diag2 = [x_0, np.array([0,x_0[1]]), x_true]
+    path_diag1 = [x_0, np.array([x_0[0],x_true[1]]), x_true]
+    path_diag2 = [x_0, np.array([x_true[0],x_0[1]]), x_true]
+    _, coord0 = coord_descent(A,b,x_0, dirn=0)
+    _, coord1 = coord_descent(A,b,x_0, dirn=1)
     # path_diag =
 
     ## errors and residuals
@@ -288,12 +322,11 @@ def vis_2x2():
     x_cg, i_cg, resids_cg, errs_cg = s_cg.solve(x_0=x_0, x_true=x_true)
 
     ## plotting ================================================================
-    fig = plt.figure("path")
-    # ax_path = plt.subplot(111)
-    spanx1 = [-2., 3.]
+    spanx1 = [-3., 3.]
     spanx2 = [-3., 6.]
+    fig = plt.figure("path", figsize=(la.norm(spanx1,1),la.norm(spanx2,1)))
 
-    x1v, x2v, ctrs = calc_contours(A=A,b=b,spanx1=spanx1, spanx2=spanx2)
+    x1v, x2v, ctrs = CG_notes.calc_contours(A=A,b=b,spanx1=spanx1, spanx2=spanx2)
     ## plot path and contours
     # fig = plt.figure("path")
     ax = fig.gca()
@@ -306,20 +339,31 @@ def vis_2x2():
     plt.ylabel("x2")
     # plt.axis('equal')
 
-    plt.plot(x_true[0], x_true[1], marker='D', markersize=10) # TRUE POINT
-    plt.plot(x_0[0], x_0[1], marker='D', markersize=10) # START POINT
+    plt.scatter(x_0[0], x_0[1], marker='D', s=100, label=r"$x_0$") # START POINT
+    plt.scatter(x_true[0], x_true[1], marker='D', s=100, label=r"$x^*$") # TRUE POINT
+
     # plt.plot([p[0] for p in path_gd], [p[1] for p in path_gd],
     #          marker='o', markersize=0.5, color="blue", label="gd")
     # plt.plot([p[0] for p in path_cg], [p[1] for p in path_cg],
     #          marker='o', markersize=0.5, color="green", label="cg")
-    plt.plot([p[0] for p in path_diag1], [p[1] for p in path_diag1],
-             marker='o', markersize=0.5, color="red", label="coord-search-1")
-    plt.plot([p[0] for p in path_diag2], [p[1] for p in path_diag2],
-             marker='o', markersize=0.5, color="orange", label="coord-search-2")
+
+    plt.plot([p[0] for p in coord0], [p[1] for p in coord0],
+         marker='o', markersize=0.5, color="red", label="coord_desc-x1")
+    plt.plot([p[0] for p in coord1], [p[1] for p in coord1],
+         marker='o', markersize=0.5, label="coord_desc-x2")
+
+    # plt.plot([p[0] for p in path_diag1], [p[1] for p in path_diag1],
+    #      marker='o', markersize=0.5, color="red", label="coord-search-1")
+    # plt.plot([p[0] for p in path_diag2], [p[1] for p in path_diag2],
+    #      marker='o', markersize=0.5, color="orange", label="coord-search-2")
+
+    plt.plot([p[0] for p in err], [p[1] for p in err],
+         marker='o', markersize=0.5, color="orange", label="err")
     plt.legend()
     plt.title("contours of Q")
     plt.grid()
     plt.show()
+    fig.savefig("out.pdf")
 
 if __name__ == "__main__":
 
